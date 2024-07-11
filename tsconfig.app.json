@@ -1,0 +1,25 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "esnext",
+    "strict": true,
+    "types": ["node"],
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "firebase": ["node_modules/firebase"]
+    },
+    "composite": true,
+    "declaration": true,
+    "declarationDir": "./types",
+    "outDir": "./dist",
+    "allowJs": true,
+    "checkJs": true,
+     // Include "jest" in the types array
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "dotenv.config.ts", "src/**/*.vue"],
+  "exclude": ["node_modules"]
+}
