@@ -11,8 +11,8 @@ const firebaseConfig = {
   apiKey: process.env.VITE_APP_FIREBASE_API_KEY,
   authDomain: process.env.VITE_APP_FIREBASE_AUTH_DOMAIN,
   projectId: process.env.VITE_APP_FIREBASE_PROJECT_ID,
-  messagingSenderId: '938950238680',
-  appId: '1:938950238680:web:f5c7afe07a0f9354d152ad'
+  messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.VITE_FIREBASE_APP_ID
   // Add other Firebase config properties
 }
 
