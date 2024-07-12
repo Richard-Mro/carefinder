@@ -31,11 +31,11 @@ jobs:
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: |
-          firebase login:ci --token "$FIREBASE_TOKEN"
+          firebase login:ci --token="${FIREBASE_TOKEN}"
 
       - name: Deploy to Firebase Hosting
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: |
-          firebase use --token "$FIREBASE_TOKEN" carefinder-70ff2
+          firebase use --token "${FIREBASE_TOKEN}" carefinder-70ff2
           firebase deploy --only hosting
