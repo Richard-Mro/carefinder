@@ -24,6 +24,9 @@ jobs:
     - name: Build project
       run: npm run build
 
+    - name: Verify dist directory
+      run: if [ ! -d "dist" ]; then echo "dist directory does not exist"; exit 1; fi
+
     - name: Deploy to Firebase
       env:
         FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
