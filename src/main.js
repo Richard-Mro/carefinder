@@ -1,12 +1,15 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-require("./assets/main.css");
-const vue_1 = require("vue");
-const pinia_1 = require("pinia");
-const App_vue_1 = __importDefault(require("./App.vue"));
-const app = (0, vue_1.createApp)(App_vue_1.default);
-app.use((0, pinia_1.createPinia)());
-app.mount('#app');
+import './assets/main.css' // Import your CSS file
+
+import { createApp } from 'vue' // Import Vue.js createApp function
+import { createPinia } from 'pinia' // Import Pinia for state management
+import App from './App.vue' // Import your main Vue component
+import './firebase' // Import Firebase app instance
+
+// Create a Vue.js application instance
+const vueApp = createApp(App)
+
+// Use Pinia for state management
+vueApp.use(createPinia())
+
+// Mount your Vue.js application to the DOM
+vueApp.mount('#app')
