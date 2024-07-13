@@ -1,8 +1,12 @@
 declare const firebaseConfig: {
-    apiKey: string | undefined;
-    authDomain: string | undefined;
-    projectId: string | undefined;
-    messagingSenderId: string;
-    appId: string;
-};
-export default firebaseConfig;
+  apiKey?: string
+  authDomain?: string
+  projectId?: string
+  databaseURL?: string
+  storageBucket?: string
+  messagingSenderId: string
+  appId: string
+  measurementId?: string
+}
+
+export default firebaseConfig
