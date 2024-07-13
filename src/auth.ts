@@ -1,5 +1,3 @@
-// auth.ts
-
 import { auth as firebaseAuth } from './firebase' // Import your initialized Firebase auth
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from 'firebase/auth'
 

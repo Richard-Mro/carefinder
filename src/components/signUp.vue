@@ -1,16 +1,17 @@
 <template>
   <div>
     <h2>Sign Up</h2>
-    <input v-model="email" type="email" placeholder="Email" />
-    <input v-model="password" type="password" placeholder="Password" />
-    <button @click="signUp">Sign Up</button>
+    <form @submit.prevent="handleSignUp">
+      <input v-model="email" type="email" placeholder="Email" required />
+      <input v-model="password" type="password" placeholder="Password" required />
+      <button type="submit">Sign Up</button>
+    </form>
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref } from 'vue';
-import { auth } from '../firebase';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { registerWithEmailAndPassword } from '@/auth'; // Adjust the import path as necessary
 
 export default defineComponent({
   name: 'SignUp',
@@ -18,9 +19,9 @@ export default defineComponent({
     const email = ref('');
     const password = ref('');
 
-    const signUp = async () => {
+    const handleSignUp = async () => {
       try {
-        await createUserWithEmailAndPassword(auth, email.value, password.value);
+        await registerWithEmailAndPassword(email.value, password.value);
         alert('User registered successfully!');
       } catch (error) {
         if (error instanceof Error) {
@@ -34,8 +35,12 @@ export default defineComponent({
     return {
       email,
       password,
-      signUp,
+      handleSignUp,
     };
   },
 });
 </script>
+
+<style scoped>
+/* Add your styles here */
+</style>
