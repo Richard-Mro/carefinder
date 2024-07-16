@@ -4,6 +4,7 @@ import { createApp } from 'vue' // Import Vue.js createApp function
 import { createPinia } from 'pinia' // Import Pinia for state management
 import App from './App.vue' // Import your main Vue component
 import './firebase' // Import Firebase app instance
+import '../dotenv.config'
 
 // Create a Vue.js application instance
 const vueApp = createApp(App)

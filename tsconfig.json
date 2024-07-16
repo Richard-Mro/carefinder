@@ -18,15 +18,16 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
-      "firebase": ["node_modules/firebase"]
+      "firebase": ["node_modules/firebase"],
+      "google.maps": ["node_modules/@types/google.maps/index.d.ts"]
     },
-    "types": ["node", "vue"],
+    "types": ["node", "vue", "google.maps", "vite/client"],
     "declaration": true,
     "declarationDir": "./types",
     "outDir": "./dist",
     "allowJs": true,
     "checkJs": true
   },
-  "include": ["src/**/*.tsx", "src/**/*.vue"],
+  "include": ["src/**/*.tsx", "src/**/*.vue", "env.d.ts", "HospitalSearch.vue" ],
   "exclude": ["node_modules"]
 }

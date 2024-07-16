@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import signUp from './components/signUp.vue';
+import HospitalSearch from '../HospitalSearch.vue';
 </script>
 
 <template>
   <header>
     <div class="wrapper">
       <signUp></signUp>
+      <HospitalSearch></HospitalSearch>
     </div>
   </header>
 </template>

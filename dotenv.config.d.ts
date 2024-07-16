@@ -7,6 +7,7 @@ declare const firebaseConfig: {
   messagingSenderId: string
   appId: string
   measurementId?: string
+  googleMapsApiKey?: string
 }
 
 export default firebaseConfig

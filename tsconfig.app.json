@@ -17,9 +17,16 @@
     "declarationDir": "./types",
     "outDir": "./dist",
     "allowJs": true,
-    "checkJs": true,
-     // Include "jest" in the types array
+    "checkJs": true
+    // Include "jest" in the types array
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "dotenv.config.ts", "src/**/*.vue"],
-  "exclude": ["node_modules"]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "dotenv.config.ts",
+    "src/**/*.vue",
+    "HospitalSearch.vue",
+    "env.d.ts"
+  ],
+  "exclude": ["node_modules"],
 }

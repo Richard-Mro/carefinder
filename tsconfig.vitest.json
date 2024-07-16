@@ -8,6 +8,14 @@
     "moduleResolution": "node",
     "types": ["node", "jsdom"]
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue", "test/**/*.ts", "dotenv.config.ts"],
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.vue",
+    "test/**/*.ts",
+    "dotenv.config.ts",
+    "HospitalSearch.vue",
+    "env.d.ts"
+  ],
   "exclude": ["node_modules"]
 }
