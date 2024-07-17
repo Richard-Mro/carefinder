@@ -1,4 +1,4 @@
-import { collection, query, where, getDocs, DocumentData } from 'firebase/firestore'
+import { collection, query, where, getDocs } from 'firebase/firestore'
 import { db } from './firebase' // Ensure db is correctly initialized as Firestore instance
 
 interface Hospital {
@@ -15,8 +15,9 @@ export async function searchHospitals(keyword: string): Promise<Hospital[]> {
   const q = query(hospitalsRef, where('name', '>=', keyword))
   const snapshot = await getDocs(q)
   const hospitals: Hospital[] = []
+
   snapshot.forEach((doc) => {
-    const data = doc.data() as DocumentData // Explicitly type data as DocumentData
+    const data = doc.data()
     hospitals.push({
       name: data.name,
       location: {
@@ -26,6 +27,7 @@ export async function searchHospitals(keyword: string): Promise<Hospital[]> {
       // Map other fields accordingly
     })
   })
+
   return hospitals
 }
 
@@ -33,8 +35,9 @@ export async function searchHospitalsNearby(lat: number, lng: number): Promise<H
   const hospitalsRef = collection(db, 'hospitals')
   const snapshot = await getDocs(hospitalsRef)
   const hospitals: Hospital[] = []
+
   snapshot.forEach((doc) => {
-    const data = doc.data() as DocumentData
+    const data = doc.data()
     if (isNearby(data.location.latitude, data.location.longitude, lat, lng)) {
       hospitals.push({
         name: data.name,
@@ -45,6 +48,7 @@ export async function searchHospitalsNearby(lat: number, lng: number): Promise<H
       })
     }
   })
+
   return hospitals
 }
 
@@ -58,5 +62,6 @@ function isNearby(
   const distance = Math.sqrt(
     Math.pow(hospitalLat - userLat, 2) + Math.pow(hospitalLng - userLng, 2)
   )
+
   return distance <= radius
 }

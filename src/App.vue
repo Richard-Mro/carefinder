@@ -7,6 +7,7 @@ import HospitalSearch from '../HospitalSearch.vue';
   <header>
     <div class="wrapper">
       <signUp></signUp>
+      <h1>CareFinder</h1>
       <HospitalSearch></HospitalSearch>
     </div>
   </header>
