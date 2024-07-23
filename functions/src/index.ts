@@ -1,5 +1,6 @@
-import { onRequest } from 'firebase-functions/v1/https';
-import * as functions from 'firebase-functions';
+import { onRequest } from 'firebase-functions/v1/https'
+import * as functions from 'firebase-functions'
+import * as logger from 'firebase-functions/logger'
 
 export const getFirebaseConfig = onRequest((request, response) => {
   response.json({
@@ -11,6 +12,11 @@ export const getFirebaseConfig = onRequest((request, response) => {
     messagingSenderId: functions.config().custom.firebase.messaging_sender_id,
     appId: functions.config().custom.firebase.app_id,
     measurementId: functions.config().custom.firebase.measurement_id,
-    googleMapsApiKey: functions.config().custom.google.maps_api_key,
-  });
-});
+    googleMapsApiKey: functions.config().custom.google.maps_api_key
+  })
+})
+
+export const helloWorld = onRequest((request, response) => {
+  logger.info('Hello logs!', { structuredData: true })
+  response.send('Hello from Firebase!')
+})
