@@ -18,7 +18,7 @@
     "outDir": "./dist",
     "allowJs": true,
     "checkJs": true
-    // Include "jest" in the types array
+ 
   },
   "include": [
     "src/**/*.ts",
