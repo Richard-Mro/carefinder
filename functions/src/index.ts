@@ -2,24 +2,22 @@ import { onRequest } from 'firebase-functions/v1/https'
 import * as functions from 'firebase-functions'
 import * as logger from 'firebase-functions/logger'
 
-// Endpoint to expose Firebase configuration
 export const getFirebaseConfig = onRequest(
   (request: functions.Request, response: functions.Response) => {
     response.json({
-      apiKey: process.env.VITE_APP_FIREBASE_API_KEY,
-      authDomain: process.env.VITE_APP_FIREBASE_AUTH_DOMAIN,
-      projectId: process.env.VITE_APP_FIREBASE_PROJECT_ID,
-      databaseURL: process.env.VITE_APP_FIREBASE_DATABASE_URL,
-      storageBucket: process.env.VITE_APP_FIREBASE_STORAGE_BUCKET,
-      messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-      appId: process.env.VITE_FIREBASE_APP_ID,
-      measurementId: process.env.VITE_FIREBASE_MEASUREMENT_ID,
-      googleMapsApiKey: process.env.VITE_APP_GOOGLE_MAPS_API_KEY
+      apiKey: functions.config().custom.firebase.api_key,
+      authDomain: functions.config().custom.firebase.auth_domain,
+      projectId: functions.config().custom.firebase.project_id,
+      databaseURL: functions.config().custom.firebase.database_url,
+      storageBucket: functions.config().custom.firebase.storage_bucket,
+      messagingSenderId: functions.config().custom.firebase.messaging_sender_id,
+      appId: functions.config().custom.firebase.app_id,
+      measurementId: functions.config().custom.firebase.measurement_id,
+      googleMapsApiKey: functions.config().custom.google.maps_api_key
     })
   }
 )
 
-// Example function
 export const helloWorld = onRequest((request: functions.Request, response: functions.Response) => {
   logger.info('Hello logs!', { structuredData: true })
   response.send('Hello from Firebase!')
