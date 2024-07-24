@@ -11,7 +11,7 @@
 
 <script lang="ts">
 import { defineComponent, ref } from 'vue';
-import { registerWithEmailAndPassword } from '@/auth'; // Adjust the import path as necessary
+import { registerWithEmailAndPassword } from '@/auth';
 
 
 export default defineComponent({

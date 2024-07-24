@@ -1,5 +1,5 @@
 /// <reference types="google.maps" />
-declare const google: any // Declare google
+declare const google: any 
 
 export async function getCurrentLocation(): Promise<google.maps.LatLng | null> {
   return new Promise((resolve, reject) => {
