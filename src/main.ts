@@ -5,7 +5,7 @@ import { createPinia } from 'pinia'
 
 import App from './App.vue'
 import './firebase' // Import Firebase initialization
-import '../dotenv.config'
+
 
 
 const app = createApp(App)
