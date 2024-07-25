@@ -10,7 +10,6 @@
     "module": "ESNext",
     "moduleResolution": "node",
     "allowSyntheticDefaultImports": true,
-    "allowArbitraryExtensions": true,
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -28,6 +27,6 @@
     "allowJs": true,
     "checkJs": true
   },
-  "include": ["src/**/*.tsx", "src/**/*.vue", "env.d.ts", "HospitalSearch.vue" ],
+  "include": ["src/**/*.tsx", "src/**/*.vue", "env.d.ts", "HospitalSearch.vue"],
   "exclude": ["node_modules"]
 }
