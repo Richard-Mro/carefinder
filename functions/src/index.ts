@@ -3,7 +3,6 @@ import * as functions from 'firebase-functions'
 import * as logger from 'firebase-functions/logger'
 
 export const getFirebaseConfig = onRequest((request, response) => {
-   console.log('getFirebaseConfig function called')
   response.json({
     apiKey: functions.config().custom.firebase.api_key,
     authDomain: functions.config().custom.firebase.auth_domain,
