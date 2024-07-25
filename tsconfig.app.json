@@ -23,7 +23,6 @@
   "include": [
     "src/**/*.ts",
     "src/**/*.tsx",
-    "dotenv.config.ts",
     "src/**/*.vue",
     "HospitalSearch.vue",
     "env.d.ts"
