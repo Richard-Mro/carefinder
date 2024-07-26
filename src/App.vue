@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import signUp from './components/signUp.vue';
-import HospitalSearch from '../HospitalSearch.vue';
+import signUp from './components/signUp.vue'
+import HospitalSearch from './components/HospitalSearch.vue'
 </script>
 
 <template>
