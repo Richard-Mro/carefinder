@@ -1,10 +1,10 @@
-// src/api/handleHospitals.ts
 import { fetchHospitals } from './fetchHospitals'
 import { uploadHospitals } from './uploadToFirestore'
+import { Hospital } from './types'
 
 export const handleHospitals = async () => {
   try {
-    const hospitals = await fetchHospitals()
+    const hospitals: Hospital[] = await fetchHospitals()
     await uploadHospitals(hospitals)
     console.log('Hospitals uploaded successfully')
   } catch (error) {
