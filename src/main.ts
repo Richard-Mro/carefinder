@@ -5,10 +5,11 @@ import { createPinia } from 'pinia'
 
 import App from './App.vue'
 import './firebase' // Import Firebase initialization
-
-
+import { handleHospitals } from './api/handleHospital'
 
 const app = createApp(App)
 
 app.use(createPinia())
 app.mount('#app')
+
+handleHospitals()

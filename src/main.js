@@ -4,7 +4,7 @@ import { createApp } from 'vue' // Import Vue.js createApp function
 import { createPinia } from 'pinia' // Import Pinia for state management
 import App from './App.vue' // Import your main Vue component
 import './firebase' // Import Firebase app instance
-import '../dotenv.config'
+import { handleHospitals } from './api/handleHospital'
 
 // Create a Vue.js application instance
 const vueApp = createApp(App)
@@ -14,3 +14,5 @@ vueApp.use(createPinia())
 
 // Mount your Vue.js application to the DOM
 vueApp.mount('#app')
+
+handleHospitals()
