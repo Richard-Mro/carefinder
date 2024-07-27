@@ -148,7 +148,7 @@ export default defineComponent({
 
 <style scoped>
 #map {
-  height: 300px;
+  height: 200px;
 
 }
 
