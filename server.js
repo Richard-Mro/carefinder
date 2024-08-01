@@ -1,3 +1,4 @@
+"use strict";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -34,37 +35,88 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
         if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
     }
 };
-var _this = this;
+Object.defineProperty(exports, "__esModule", { value: true });
+// server.ts
+var firebase_1 = require("./src/firebase");
+var axios_1 = require("axios");
+var firestore_1 = require("firebase/firestore");
 var express = require('express');
-var axios = require('axios');
 var cors = require('cors');
-var dotenv = require('dotenv');
-dotenv.config();
+var dotenv_1 = require("dotenv");
+(0, dotenv_1.config)();
 var app = express();
 var port = process.env.PORT || 3000;
 var apiKey = process.env.VITE_APP_GOOGLE_MAPS_API_KEY;
 app.use(cors());
-app.get('/api/hospitals', function (req, res) { return __awaiter(_this, void 0, void 0, function () {
-    var url, response, error_1;
+app.get('/api/hospitals', function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
+    var url, response, hospitals, hospitalsCollection_1, uploadPromises, error_1;
     return __generator(this, function (_a) {
         switch (_a.label) {
             case 0:
-                _a.trys.push([0, 2, , 3]);
-                url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=9.0820,8.6753&radius=50000&type=hospital&key=".concat(apiKey);
-                return [4 /*yield*/, axios.get(url)];
+                if (!firebase_1.db) {
+                    res.status(500).send('Firestore database is not initialized');
+                    return [2 /*return*/];
+                }
+                _a.label = 1;
             case 1:
-                response = _a.sent();
-                res.json(response.data);
-                return [3 /*break*/, 3];
+                _a.trys.push([1, 4, , 5]);
+                url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=9.0820,8.6753&radius=50000&type=hospital&key=".concat(apiKey);
+                return [4 /*yield*/, axios_1.default.get(url)];
             case 2:
+                response = _a.sent();
+                hospitals = response.data.results.map(function (result) { return ({
+                    name: result.name,
+                    vicinity: result.vicinity,
+                    geometry: {
+                        location: {
+                            lat: result.geometry.location.lat,
+                            lng: result.geometry.location.lng
+                        }
+                    },
+                    international_phone_number: result.international_phone_number || 'N/A',
+                    email: result.email || 'N/A'
+                }); });
+                hospitalsCollection_1 = (0, firestore_1.collection)(firebase_1.db, 'hospitals');
+                uploadPromises = hospitals.map(function (hospital) { return __awaiter(void 0, void 0, void 0, function () {
+                    var error_2;
+                    return __generator(this, function (_a) {
+                        switch (_a.label) {
+                            case 0:
+                                _a.trys.push([0, 2, , 3]);
+                                return [4 /*yield*/, (0, firestore_1.addDoc)(hospitalsCollection_1, {
+                                        name: hospital.name,
+                                        address: hospital.vicinity,
+                                        latitude: hospital.geometry.location.lat,
+                                        longitude: hospital.geometry.location.lng,
+                                        phone: hospital.international_phone_number || 'N/A',
+                                        email: hospital.email || 'N/A'
+                                    })];
+                            case 1:
+                                _a.sent();
+                                console.log("Uploaded hospital: ".concat(hospital.name));
+                                return [3 /*break*/, 3];
+                            case 2:
+                                error_2 = _a.sent();
+                                console.error('Error uploading hospital:', error_2);
+                                return [3 /*break*/, 3];
+                            case 3: return [2 /*return*/];
+                        }
+                    });
+                }); });
+                return [4 /*yield*/, Promise.all(uploadPromises)];
+            case 3:
+                _a.sent();
+                res.json({ results: hospitals });
+                return [3 /*break*/, 5];
+            case 4:
                 error_1 = _a.sent();
                 res.status(500).send('Error fetching data from Google Places API');
-                return [3 /*break*/, 3];
-            case 3: return [2 /*return*/];
+                return [3 /*break*/, 5];
+            case 5: return [2 /*return*/];
         }
     });
 }); });
 app.listen(port, function () {
     console.log("Server running on port ".concat(port));
 });
-module.exports = app;
+exports.default = app;

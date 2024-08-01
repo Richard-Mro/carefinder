@@ -6,6 +6,7 @@
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.vitest.tsbuildinfo",
     "module": "esnext",
     "moduleResolution": "node",
+    "esModuleInterop": true,
     "types": ["node", "jsdom"]
   },
   "include": [

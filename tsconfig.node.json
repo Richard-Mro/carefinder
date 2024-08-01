@@ -10,8 +10,9 @@
   "compilerOptions": {
     "composite": true,
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
-    "module": "esnext",
+    "module": "CommonJS",
     "moduleResolution": "node",
+    "esModuleInterop": true,
     "types": ["node"]
   }
 }

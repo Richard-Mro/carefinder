@@ -1,4 +1,4 @@
-// File: src/services/hospitalService.ts
+
 
 import { collection, query, where, getDocs, Firestore } from 'firebase/firestore'
 import { db } from '../firebase'

@@ -149,7 +149,6 @@ export default defineComponent({
 <style scoped>
 #map {
   height: 200px;
-
 }
 
 input,
