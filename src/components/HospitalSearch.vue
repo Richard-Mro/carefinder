@@ -9,24 +9,28 @@
     />
     <!-- Button to search nearby hospitals -->
     <button @click="searchNearbyHospitals">Search Nearby Hospitals</button>
-    
+
     <!-- List of hospitals -->
     <ul>
-      <li v-for="hospital in hospitals" :key="hospital.id">
+      <li v-for="hospital in paginatedHospitals" :key="hospital.id" class="hospital-card">
         <h3>{{ hospital.name }}</h3>
         <p>Address: {{ hospital.address }}</p>
         <p>Phone: {{ hospital.phone }}</p>
         <p>Website: <a :href="hospital.website" target="_blank">{{ hospital.website }}</a></p>
       </li>
     </ul>
-    
+
+    <!-- Pagination controls -->
+    <button @click="prevPage" :disabled="currentPage === 1">Previous</button>
+    <button @click="nextPage" :disabled="currentPage === totalPages">Next</button>
+
     <!-- Map container -->
-    <div id="map"></div>
+    <div id="map" style="height: 500px; width: 100%;"></div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted } from 'vue';
+import { defineComponent, ref, computed, onMounted } from 'vue';
 import { searchHospitals, searchHospitalsNearby } from '@/services/hospitalService';
 import { getCurrentLocation } from '@/services/geolocationHelper';
 import { Hospital } from '@/api/types';
@@ -37,41 +41,56 @@ declare global {
   }
 }
 
-interface LatLng {
-  latitude: number;
-  longitude: number;
-}
-
 export default defineComponent({
   name: 'HospitalSearch',
   setup() {
     const searchKeyword = ref('');
     const hospitals = ref<Hospital[]>([]);
+    const currentPage = ref(1);
+    const hospitalsPerPage = 10;
     let map: google.maps.Map | null = null;
     const markers: google.maps.Marker[] = [];
 
-    // Function to perform hospital search based on keyword
+    const filteredHospitals = computed(() => {
+      const keyword = searchKeyword.value.toLowerCase();
+      return hospitals.value.filter(hospital =>
+        hospital.name.toLowerCase().includes(keyword) ||
+        hospital.address.toLowerCase().includes(keyword)
+      );
+    });
+
+    const paginatedHospitals = computed(() => {
+      const start = (currentPage.value - 1) * hospitalsPerPage;
+      const end = start + hospitalsPerPage;
+      return filteredHospitals.value.slice(start, end);
+    });
+
+    const totalPages = computed(() => {
+      return Math.ceil(filteredHospitals.value.length / hospitalsPerPage);
+    });
+
     const performSearch = async () => {
       try {
-        const results = await searchHospitals(searchKeyword.value);
+        const results = await searchHospitals(searchKeyword.value.toLowerCase());
         hospitals.value = results as Hospital[];
+        currentPage.value = 1;
         updateMapMarkers();
       } catch (error) {
         console.error('Error searching hospitals:', error);
       }
     };
 
-    // Function to search nearby hospitals based on current location
     const searchNearbyHospitals = async () => {
       try {
         const location = await getCurrentLocation();
         if (location) {
-          const latLng: LatLng = {
+          const latLng = {
             latitude: location.lat(),
             longitude: location.lng()
           };
           const results = await searchHospitalsNearby(latLng.latitude, latLng.longitude);
           hospitals.value = results as Hospital[];
+          currentPage.value = 1;
           updateMapMarkers();
         } else {
           throw new Error('Could not get current location.');
@@ -83,13 +102,24 @@ export default defineComponent({
       }
     };
 
-    // Function to update map markers based on hospitals
+    const prevPage = () => {
+      if (currentPage.value > 1) {
+        currentPage.value--;
+      }
+    };
+
+    const nextPage = () => {
+      if (currentPage.value < totalPages.value) {
+        currentPage.value++;
+      }
+    };
+
     const updateMapMarkers = () => {
       if (!map) return;
       markers.forEach((marker) => marker.setMap(null));
       markers.length = 0;
 
-      hospitals.value.forEach((hospital) => {
+      paginatedHospitals.value.forEach((hospital) => {
         const marker = new google.maps.Marker({
           position: { lat: hospital.location.latitude, lng: hospital.location.longitude },
           map: map!,
@@ -99,17 +129,23 @@ export default defineComponent({
       });
     };
 
-    // Initialize Google Maps on component mount
-    onMounted(() => {
+    onMounted(async () => {
+      try {
+        const results = await searchHospitals('');
+        hospitals.value = results as Hospital[];
+        updateMapMarkers();
+      } catch (error) {
+        console.error('Error fetching hospitals:', error);
+      }
+
       window.initMap = () => {
         map = new google.maps.Map(document.getElementById('map') as HTMLElement, {
-          center: { lat: 7.4417, lng: 3.9 }, // Default center if location is not available
-          zoom: 8,
+          center: { lat: 9.082, lng: 8.6753 }, // Centered around Nigeria
+          zoom: 6
         });
         updateMapMarkers();
       };
 
-      // Load Google Maps script if not already loaded
       if (!document.querySelector('script[src="https://maps.googleapis.com/maps/api/js"]')) {
         const script = document.createElement('script');
         script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_APP_GOOGLE_MAPS_API_KEY}&callback=initMap`;
@@ -127,30 +163,23 @@ export default defineComponent({
 
     return {
       searchKeyword,
-      hospitals,
+      paginatedHospitals,
+      currentPage,
+      totalPages,
       performSearch,
       searchNearbyHospitals,
+      prevPage,
+      nextPage
     };
-  },
+  }
 });
 </script>
 
 <style scoped>
-#map {
-  height: 200px; /* Adjusted to a more reasonable size */
-}
-
-input,
-button {
-  margin: 10px 0;
-}
-
-ul {
-  list-style-type: none;
-  padding: 0;
-}
-
-li {
-  margin: 20px 0;
+.hospital-card {
+  border: 1px solid #ddd;
+  padding: 10px;
+  margin-bottom: 10px;
+  border-radius: 4px;
 }
 </style>

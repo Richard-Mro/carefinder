@@ -4,7 +4,7 @@ import { config } from 'dotenv'
 
 config()
 
-const apiKey = process.env.VITE_APP_GOOGLE_MAPS_API_KEY
+const apiKey = import.meta.env.VITE_APP_GOOGLE_MAPS_API_KEY
 const states = [
   'Abia',
   'Adamawa',
