@@ -12,12 +12,11 @@
     
     <!-- List of hospitals -->
     <ul>
-      <li v-for="hospital in hospitals" :key="hospital.name">
+      <li v-for="hospital in hospitals" :key="hospital.id">
         <h3>{{ hospital.name }}</h3>
         <p>Address: {{ hospital.address }}</p>
         <p>Phone: {{ hospital.phone }}</p>
-        <p>Email: {{ hospital.email }}</p>
-        <p>Location: Lat: {{ hospital.location.latitude }}, Lng: {{ hospital.location.longitude }}</p>
+        <p>Website: <a :href="hospital.website" target="_blank">{{ hospital.website }}</a></p>
       </li>
     </ul>
     
@@ -30,17 +29,7 @@
 import { defineComponent, ref, onMounted } from 'vue';
 import { searchHospitals, searchHospitalsNearby } from '@/services/hospitalService';
 import { getCurrentLocation } from '@/services/geolocationHelper';
-
-interface Hospital {
-  name: string;
-  address: string;
-  phone: string;
-  email: string;
-  location: {
-    latitude: number;
-    longitude: number;
-  };
-}
+import { Hospital } from '@/api/types';
 
 declare global {
   interface Window {
@@ -148,7 +137,7 @@ export default defineComponent({
 
 <style scoped>
 #map {
-  height: 200px;
+  height: 200px; /* Adjusted to a more reasonable size */
 }
 
 input,

@@ -1,13 +1,11 @@
 export interface Hospital {
   id: string
   name: string
-  vicinity: string
-  geometry: {
-    location: {
-      lat: number
-      lng: number
-    }
+  address: string
+  phone: string
+  website: string
+  location: {
+    latitude: number
+    longitude: number
   }
-  international_phone_number?: string
-  email?: string
 }

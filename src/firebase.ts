@@ -1,11 +1,11 @@
-import { initializeApp, getApps, getApp } from 'firebase/app'
+import { initializeApp } from 'firebase/app'
 import { getFirestore } from 'firebase/firestore'
-import { getAuth, Auth } from 'firebase/auth'
-import * as dotenv from 'dotenv'
+import { getAuth } from 'firebase/auth'
+import dotenv from 'dotenv'
+
+// Load environment variables from the .env file
 dotenv.config()
 
-
-// Use process.env to access environment variables
 const firebaseConfig = {
   apiKey: process.env.VITE_APP_FIREBASE_API_KEY!,
   authDomain: process.env.VITE_APP_FIREBASE_AUTH_DOMAIN!,
@@ -18,24 +18,9 @@ const firebaseConfig = {
   googleMapsApiKey: process.env.VITE_APP_GOOGLE_MAPS_API_KEY!
 }
 
-let app: ReturnType<typeof initializeApp> | undefined
-let db: ReturnType<typeof getFirestore> | undefined
-let auth: Auth | undefined
-
-function initializeFirebase() {
-  if (getApps().length === 0) {
-    app = initializeApp(firebaseConfig)
-  } else {
-    app = getApp()
-  }
-
-  // Ensure app is initialized before getting Firestore and Auth
-  if (app) {
-    db = getFirestore(app)
-    auth = getAuth(app)
-  }
-}
-
-initializeFirebase()
+// Initialize Firebase
+const app = initializeApp(firebaseConfig)
+const db = getFirestore(app)
+const auth = getAuth(app)
 
 export { app, db, auth }

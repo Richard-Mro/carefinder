@@ -1,18 +1,6 @@
-
-
 import { collection, query, where, getDocs, Firestore } from 'firebase/firestore'
 import { db } from '../firebase'
-
-interface Hospital {
-  name: string
-  address: string
-  phone: string
-  email: string
-  location: {
-    latitude: number
-    longitude: number
-  }
-}
+import { Hospital } from 'src/api/types'
 
 function getFirestoreCollection(db: Firestore | undefined, collectionName: string) {
   if (!db) {
@@ -29,14 +17,17 @@ export async function searchHospitals(keyword: string): Promise<Hospital[]> {
 
   snapshot.forEach((doc) => {
     const data = doc.data()
+    console.log('Fetched data:', data) // Debugging log
+
     hospitals.push({
-      name: data.name,
-      address: data.address,
-      phone: data.phone,
-      email: data.email,
+      id: doc.id,
+      name: data.name || 'Unknown',
+      address: data.address || 'Unknown',
+      phone: data.phone || 'N/A',
+      website: data.website || 'N/A',
       location: {
-        latitude: data.location.latitude,
-        longitude: data.location.longitude
+        latitude: data.latitude ?? 0,
+        longitude: data.longitude ?? 0
       }
     })
   })
@@ -46,7 +37,7 @@ export async function searchHospitals(keyword: string): Promise<Hospital[]> {
 
 export async function searchHospitalsNearby(lat: number, lng: number): Promise<Hospital[]> {
   const hospitalsRef = getFirestoreCollection(db, 'hospitals')
-  const radius = 10 // Adjust radius as needed
+  const radius = 10 // Radius in kilometers
 
   // Calculate latitude bounds
   const latDelta = radius / 111 // Approx. 1 degree latitude is about 111 km
@@ -60,10 +51,10 @@ export async function searchHospitalsNearby(lat: number, lng: number): Promise<H
 
   const q = query(
     hospitalsRef,
-    where('location.latitude', '>=', latMin),
-    where('location.latitude', '<=', latMax),
-    where('location.longitude', '>=', lngMin),
-    where('location.longitude', '<=', lngMax)
+    where('latitude', '>=', latMin),
+    where('latitude', '<=', latMax),
+    where('longitude', '>=', lngMin),
+    where('longitude', '<=', lngMax)
   )
 
   const snapshot = await getDocs(q)
@@ -71,15 +62,20 @@ export async function searchHospitalsNearby(lat: number, lng: number): Promise<H
 
   snapshot.forEach((doc) => {
     const data = doc.data()
-    if (isNearby(data.location.latitude, data.location.longitude, lat, lng, radius)) {
+
+    const hospitalLat = data.latitude ?? 0
+    const hospitalLng = data.longitude ?? 0
+
+    if (isNearby(hospitalLat, hospitalLng, lat, lng, radius)) {
       hospitals.push({
-        name: data.name,
-        address: data.address,
-        phone: data.phone,
-        email: data.email,
+        id: doc.id,
+        name: data.name || 'Unknown',
+        address: data.address || 'Unknown',
+        phone: data.phone || 'N/A',
+        website: data.website || 'N/A',
         location: {
-          latitude: data.location.latitude,
-          longitude: data.location.longitude
+          latitude: hospitalLat,
+          longitude: hospitalLng
         }
       })
     }
@@ -95,9 +91,17 @@ function isNearby(
   userLng: number,
   radius = 10
 ): boolean {
-  const distance = Math.sqrt(
-    Math.pow(hospitalLat - userLat, 2) + Math.pow(hospitalLng - userLng, 2)
-  )
+  const R = 6371 // Radius of the Earth in km
+  const dLat = (hospitalLat - userLat) * (Math.PI / 180)
+  const dLng = (hospitalLng - userLng) * (Math.PI / 180)
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(userLat * (Math.PI / 180)) *
+      Math.cos(hospitalLat * (Math.PI / 180)) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  const distance = R * c // Distance in km
 
   return distance <= radius
 }

@@ -10,26 +10,25 @@ export const fetchHospitals = async (): Promise<Hospital[]> => {
 
     const hospitalsCollection = collection(db, 'hospitals')
     const snapshot = await getDocs(hospitalsCollection)
-    const hospitalsList = snapshot.docs
+
+    const hospitalsList: Hospital[] = snapshot.docs
       .map((doc) => {
         const data = doc.data()
 
         // Normalize data structure
-        const hospitalData: Omit<Hospital, 'id'> = {
-          name: data.name,
-          vicinity: data.vicinity,
-          geometry: {
-            location: {
-              lat: data.geometry?.location?.lat ?? data.location?.lat,
-              lng: data.geometry?.location?.lng ?? data.location?.lng
-            }
-          },
-          international_phone_number: data.international_phone_number || data.phone || 'N/A',
-          email: data.email || 'N/A'
+        const hospitalData: Partial<Hospital> = {
+          name: data.name || 'Unknown',
+          address: data.address || 'Unknown',
+          phone: data.phone || 'Not Provided',
+          website: data.website || 'Not Available', // Updated from email to website
+          location: {
+            latitude: data.location?.latitude ?? 0,
+            longitude: data.location?.longitude ?? 0
+          }
         }
 
         // Validate the required fields
-        if (!hospitalData.name || !hospitalData.vicinity || !hospitalData.geometry.location) {
+        if (!hospitalData.name || !hospitalData.address || !hospitalData.location) {
           console.error('Invalid hospital data:', data)
           return null
         }
@@ -37,7 +36,7 @@ export const fetchHospitals = async (): Promise<Hospital[]> => {
         return {
           id: doc.id,
           ...hospitalData
-        }
+        } as Hospital
       })
       .filter((hospital): hospital is Hospital => hospital !== null)
 
