@@ -1,8 +1,8 @@
-// src/router/index.js
 import { createRouter, createWebHistory } from 'vue-router'
 import Signup from '../views/signUp.vue'
 import Login from '../views/Login.vue'
 import HospitalSearch from '../views/HospitalSearch.vue'
+import ShareHospitals from '../components/shareHospitals.vue'
 import { auth } from '../firebase'
 
 const routes = [
@@ -13,6 +13,11 @@ const routes = [
     name: 'HospitalSearch',
     component: HospitalSearch,
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/share',
+    name: 'ShareHospitals',
+    component: ShareHospitals
   }
 ]
 

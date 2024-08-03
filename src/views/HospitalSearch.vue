@@ -10,6 +10,15 @@
     <!-- Button to search nearby hospitals -->
     <button @click="searchNearbyHospitals">Search Nearby Hospitals</button>
 
+    <!-- Button to export hospitals data -->
+    <button @click="exportHospitals">Export to CSV</button>
+
+    <!-- Button to share via email -->
+    <button @click="shareViaEmail">Share via Email</button>
+
+    <!-- Button to generate shareable link -->
+    <button @click="generateShareableLink">Generate Shareable Link</button>
+
     <!-- List of hospitals -->
     <ul>
       <li v-for="hospital in paginatedHospitals" :key="hospital.id" class="hospital-card">
@@ -34,6 +43,9 @@ import { defineComponent, ref, computed, onMounted } from 'vue';
 import { searchHospitals, searchHospitalsNearby } from '@/services/hospitalService';
 import { getCurrentLocation } from '@/services/geolocationHelper';
 import { Hospital } from '@/api/types';
+import { exportHospitalsToCSV } from '@/utils/csvExporter';
+import { downloadCSV } from '@/utils/fileDownloader';
+import { generateShareableLink, composeEmailBody } from '../utils/shareHelpers';
 
 declare global {
   interface Window {
@@ -129,6 +141,30 @@ export default defineComponent({
       });
     };
 
+    const exportHospitals = () => {
+      // Convert hospitals.value to CSV format
+      const csvContent = exportHospitalsToCSV(hospitals.value);
+      // Trigger download of CSV file
+      downloadCSV('hospitals.csv', csvContent);
+    };
+
+    const shareViaEmail = () => {
+      const emailBody = composeEmailBody(hospitals.value);
+      const mailtoLink = `mailto:?subject=Hospital Information&body=${encodeURIComponent(emailBody)}`;
+
+      console.log('Generated mailto link:', mailtoLink); // Debugging line
+      window.location.href = mailtoLink;
+    };
+
+    const generateShareableLinkHandler = () => {
+      const shareableLink = generateShareableLink(hospitals.value);
+      navigator.clipboard.writeText(shareableLink).then(() => {
+        alert('Shareable link copied to clipboard!');
+      }, (err) => {
+        console.error('Failed to copy shareable link: ', err);
+      });
+    };
+
     onMounted(async () => {
       try {
         const results = await searchHospitals('');
@@ -169,17 +205,21 @@ export default defineComponent({
       performSearch,
       searchNearbyHospitals,
       prevPage,
-      nextPage
+      nextPage,
+      exportHospitals,
+      shareViaEmail,
+      generateShareableLink: generateShareableLinkHandler
     };
   }
 });
 </script>
 
-<style scoped>
+<style>
+/* Add some basic styling for the hospital cards */
 .hospital-card {
-  border: 1px solid #ddd;
+  border: 1px solid #ccc;
   padding: 10px;
   margin-bottom: 10px;
-  border-radius: 4px;
+  list-style: none;
 }
 </style>
