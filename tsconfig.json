@@ -27,6 +27,6 @@
     "allowJs": true,
     "checkJs": true
   },
-  "include": ["src/**/*.tsx", "src/**/*.vue", "env.d.ts", "HospitalSearch.vue"],
+  "include": ["src/**/*.tsx", "src/**/*.vue", "env.d.ts",],
   "exclude": ["node_modules"]
 }

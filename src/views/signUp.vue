@@ -11,19 +11,21 @@
 
 <script lang="ts">
 import { defineComponent, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import { registerWithEmailAndPassword } from '@/auth';
-
 
 export default defineComponent({
   name: 'SignUp',
   setup() {
     const email = ref('');
     const password = ref('');
+    const router = useRouter();
 
     const handleSignUp = async () => {
       try {
         await registerWithEmailAndPassword(email.value, password.value);
         alert('User registered successfully!');
+        router.push('/hospital-search');
       } catch (error) {
         if (error instanceof Error) {
           alert(error.message);
