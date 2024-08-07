@@ -3,6 +3,8 @@ import Signup from '../views/signUp.vue'
 import Login from '../views/Login.vue'
 import HospitalSearch from '../views/HospitalSearch.vue'
 import ShareHospitals from '../components/shareHospitals.vue'
+import CreateHospitalEntry from '../views/CreateHospitalEntry.vue'
+import ViewHospitalEntry from '../views/viewHospitalEntry.vue'
 import { auth } from '../firebase'
 
 const routes = [
@@ -12,13 +14,27 @@ const routes = [
     path: '/hospital-search',
     name: 'HospitalSearch',
     component: HospitalSearch,
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: true } // Protected route
   },
   {
     path: '/share',
     name: 'ShareHospitals',
     component: ShareHospitals
-  }
+  },
+  {
+    path: '/create-hospital',
+    name: 'CreateHospitalEntry',
+    component: CreateHospitalEntry,
+    meta: { requiresAuth: true } // Protected route
+  },
+  {
+    path: '/hospitals/:id',
+    name: 'ViewHospitalEntry',
+    component: ViewHospitalEntry,
+    meta: { requiresAuth: true }, // Protected route
+    props: true // Pass route params as props to the component
+  },
+  { path: '/', redirect: '/login' } // Redirect to login as default route
 ]
 
 const router = createRouter({
@@ -26,9 +42,11 @@ const router = createRouter({
   routes
 })
 
+// Navigation guard to protect routes based on authentication
 router.beforeEach((to, from, next) => {
   const requiresAuth = to.matched.some((record) => record.meta.requiresAuth)
   const user = auth.currentUser
+
   if (requiresAuth && !user) {
     next('/login')
   } else {

@@ -27,6 +27,12 @@ jobs:
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
 
+      - name: Create Firebase service account file
+        env:
+          FIREBASE_SERVICE_ACCOUNT_CAREFINDER_70FF2: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_CAREFINDER_70FF2 }}
+        run: |
+          echo "${FIREBASE_SERVICE_ACCOUNT_CAREFINDER_70FF2}" > serviceAccountKey.json
+
       - name: Deploy to Firebase Hosting
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}

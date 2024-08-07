@@ -1,42 +1,48 @@
 <template>
   <div>
-    <!-- Search input -->
     <input
       type="text"
       v-model="searchKeyword"
       @input="performSearch"
       placeholder="Search hospitals..."
     />
-    <!-- Button to search nearby hospitals -->
     <button @click="searchNearbyHospitals">Search Nearby Hospitals</button>
-
-    <!-- Button to export hospitals data -->
     <button @click="exportHospitals">Export to CSV</button>
-
-    <!-- Button to share via email -->
     <button @click="shareViaEmail">Share via Email</button>
-
-    <!-- Button to generate shareable link -->
     <button @click="generateShareableLink">Generate Shareable Link</button>
 
-    <!-- List of hospitals -->
     <ul>
       <li v-for="hospital in paginatedHospitals" :key="hospital.id" class="hospital-card">
         <h3>{{ hospital.name }}</h3>
         <p>Address: {{ hospital.address }}</p>
         <p>Phone: {{ hospital.phone }}</p>
         <p>Website: <a :href="hospital.website" target="_blank">{{ hospital.website }}</a></p>
+        <div v-html="hospitalContent(hospital.markdown)"></div>
+
+        <button @click="openEditModal(hospital)">Edit Markdown</button>
+
+        <router-link :to="{ name: 'ViewHospitalEntry', params: { id: hospital.id } }">
+          View Details
+        </router-link>
       </li>
     </ul>
 
-    <!-- Pagination controls -->
     <button @click="prevPage" :disabled="currentPage === 1">Previous</button>
     <button @click="nextPage" :disabled="currentPage === totalPages">Next</button>
 
-    <!-- Map container -->
     <div id="map" style="height: 500px; width: 100%;"></div>
+
+    <div v-if="showEditModal" class="modal">
+      <div class="modal-content">
+        <span class="close" @click="closeEditModal">&times;</span>
+        <h2>Edit Markdown Content</h2>
+        <textarea v-model="editedMarkdown" rows="10" cols="50"></textarea>
+        <button @click="saveMarkdown">Save</button>
+      </div>
+    </div>
   </div>
 </template>
+
 
 <script lang="ts">
 import { defineComponent, ref, computed, onMounted } from 'vue';
@@ -45,13 +51,11 @@ import { getCurrentLocation } from '@/services/geolocationHelper';
 import { Hospital } from '@/api/types';
 import { exportHospitalsToCSV } from '@/utils/csvExporter';
 import { downloadCSV } from '@/utils/fileDownloader';
-import { generateShareableLink, composeEmailBody } from '../utils/shareHelpers';
+import { generateShareableLink, composeEmailBody } from '@/utils/shareHelpers';
+import { updateHospitalMarkdown } from '@/services/hospitalService'; // Import the update function
+import * as marked from 'marked';
 
-declare global {
-  interface Window {
-    initMap: () => void;
-  }
-}
+
 
 export default defineComponent({
   name: 'HospitalSearch',
@@ -62,12 +66,16 @@ export default defineComponent({
     const hospitalsPerPage = 10;
     let map: google.maps.Map | null = null;
     const markers: google.maps.Marker[] = [];
+    const showEditModal = ref(false);
+    const editedMarkdown = ref('');
+    let editingHospitalId = '';
 
     const filteredHospitals = computed(() => {
       const keyword = searchKeyword.value.toLowerCase();
       return hospitals.value.filter(hospital =>
         hospital.name.toLowerCase().includes(keyword) ||
-        hospital.address.toLowerCase().includes(keyword)
+        hospital.address.toLowerCase().includes(keyword) ||
+        (hospital.markdown && hospital.markdown.toLowerCase().includes(keyword))
       );
     });
 
@@ -110,7 +118,7 @@ export default defineComponent({
       } catch (error) {
         const errorMessage = (error as Error).message;
         console.error('Error getting current location:', errorMessage);
-        alert(errorMessage); // Show an alert to the user
+        alert(errorMessage);
       }
     };
 
@@ -142,19 +150,18 @@ export default defineComponent({
     };
 
     const exportHospitals = () => {
-      // Convert hospitals.value to CSV format
       const csvContent = exportHospitalsToCSV(hospitals.value);
-      // Trigger download of CSV file
       downloadCSV('hospitals.csv', csvContent);
     };
 
-    const shareViaEmail = () => {
-      const emailBody = composeEmailBody(hospitals.value);
-      const mailtoLink = `mailto:?subject=Hospital Information&body=${encodeURIComponent(emailBody)}`;
+  const shareViaEmail = () => {
+  const emailBody = composeEmailBody(hospitals.value);
+  const mailtoLink = `mailto:?subject=Hospital Information&body=${encodeURIComponent(emailBody)}`;
+  console.log(mailtoLink);  // Log the link to verify
+  window.location.href = mailtoLink;
+};
 
-      console.log('Generated mailto link:', mailtoLink); // Debugging line
-      window.location.href = mailtoLink;
-    };
+
 
     const generateShareableLinkHandler = () => {
       const shareableLink = generateShareableLink(hospitals.value);
@@ -163,6 +170,35 @@ export default defineComponent({
       }, (err) => {
         console.error('Failed to copy shareable link: ', err);
       });
+    };
+
+    const hospitalContent = (markdown: string | undefined) => {
+      return markdown ? marked.parse(markdown) : '';
+    };
+
+    const openEditModal = (hospital: Hospital) => {
+      showEditModal.value = true;
+      editedMarkdown.value = hospital.markdown;
+      editingHospitalId = hospital.id;
+    };
+
+    const closeEditModal = () => {
+      showEditModal.value = false;
+      editedMarkdown.value = '';
+      editingHospitalId = '';
+    };
+
+    const saveMarkdown = async () => {
+      try {
+        await updateHospitalMarkdown(editingHospitalId, editedMarkdown.value);
+        const hospital = hospitals.value.find(h => h.id === editingHospitalId);
+        if (hospital) {
+          hospital.markdown = editedMarkdown.value;
+        }
+        closeEditModal();
+      } catch (error) {
+        console.error('Error saving markdown:', error);
+      }
     };
 
     onMounted(async () => {
@@ -176,7 +212,7 @@ export default defineComponent({
 
       window.initMap = () => {
         map = new google.maps.Map(document.getElementById('map') as HTMLElement, {
-          center: { lat: 9.082, lng: 8.6753 }, // Centered around Nigeria
+          center: { lat: 9.082, lng: 8.6753 },
           zoom: 6
         });
         updateMapMarkers();
@@ -193,7 +229,7 @@ export default defineComponent({
         };
         document.head.appendChild(script);
       } else {
-        window.initMap(); // Initialize the map if the script is already loaded
+        window.initMap();
       }
     });
 
@@ -208,18 +244,59 @@ export default defineComponent({
       nextPage,
       exportHospitals,
       shareViaEmail,
-      generateShareableLink: generateShareableLinkHandler
+      generateShareableLink: generateShareableLinkHandler,
+      hospitalContent,
+      showEditModal,
+      editedMarkdown,
+      openEditModal,
+      closeEditModal,
+      saveMarkdown
     };
   }
 });
 </script>
 
-<style>
-/* Add some basic styling for the hospital cards */
+
+<style scoped>
 .hospital-card {
   border: 1px solid #ccc;
   padding: 10px;
   margin-bottom: 10px;
-  list-style: none;
+}
+
+.modal {
+  display: block;
+  position: fixed;
+  z-index: 1;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgb(0,0,0);
+  background-color: rgba(0,0,0,0.4);
+}
+
+.modal-content {
+  background-color: #fefefe;
+  margin: 15% auto;
+  padding: 20px;
+  border: 1px solid #888;
+  width: 80%;
+}
+
+.close {
+  color: #aaa;
+  float: right;
+  font-size: 28px;
+  font-weight: bold;
+}
+
+.close:hover,
+.close:focus {
+  color: black;
+  text-decoration: none;
+  cursor: pointer;
 }
 </style>
+

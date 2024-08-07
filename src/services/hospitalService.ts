@@ -1,5 +1,6 @@
 import { collection, query, where, getDocs, Firestore } from 'firebase/firestore'
 import { db } from '../firebase'
+import { doc, updateDoc } from 'firebase/firestore'
 import { Hospital } from 'src/api/types'
 
 function getFirestoreCollection(db: Firestore | undefined, collectionName: string) {
@@ -31,6 +32,7 @@ export async function searchHospitals(keyword: string): Promise<Hospital[]> {
         address: data.address || 'Unknown',
         phone: data.phone || 'N/A',
         website: data.website || 'N/A',
+        markdown: data.markdown ||'N/A',
         location: {
           latitude: data.latitude ?? 0,
           longitude: data.longitude ?? 0
@@ -40,6 +42,11 @@ export async function searchHospitals(keyword: string): Promise<Hospital[]> {
   })
 
   return hospitals
+}
+
+export const updateHospitalMarkdown = async (id: string, markdown: string) => {
+  const hospitalRef = doc(db, 'hospitals', id)
+  await updateDoc(hospitalRef, { markdown })
 }
 
 export async function searchHospitalsNearby(lat: number, lng: number): Promise<Hospital[]> {
@@ -77,6 +84,7 @@ export async function searchHospitalsNearby(lat: number, lng: number): Promise<H
         address: data.address || 'Unknown',
         phone: data.phone || 'N/A',
         website: data.website || 'N/A',
+        markdown: data.markdown || 'N/A',
         location: {
           latitude: hospitalLat,
           longitude: hospitalLng

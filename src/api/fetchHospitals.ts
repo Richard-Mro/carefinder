@@ -21,6 +21,7 @@ export const fetchHospitals = async (): Promise<Hospital[]> => {
           address: data.address || 'Unknown',
           phone: data.phone || 'Not Provided',
           website: data.website || 'Not Available', // Updated from email to website
+          markdown: data.markdown || 'N/A',
           location: {
             latitude: data.location?.latitude ?? 0,
             longitude: data.location?.longitude ?? 0
