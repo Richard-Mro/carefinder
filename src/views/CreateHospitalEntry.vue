@@ -1,43 +1,93 @@
 <template>
   <div>
-    <MarkdownEditor v-model="hospitalDetails.markdown" />
-    <button @click="saveEntry">Save Entry</button>
+    <h1>Create Hospital Entry</h1>
+    <p v-if="currentUser">Logged in as: {{ currentUser.email }}</p>
+    <p v-else>Please log in.</p>
+    <form @submit.prevent="submitEntry">
+      <input v-model="hospitalName" placeholder="Hospital Name" required />
+      <MarkdownEditor v-model="hospitalDetails" />
+      <button type="submit">Submit</button>
+    </form>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from 'vue'
-import MarkdownEditor from '../components/MarkdownEditor.vue'
-import { db } from '../firebase'
-import { collection, addDoc } from 'firebase/firestore'
+import { defineComponent, ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
+import { auth, db } from '../firebase';
+import { collection, query, where, getDocs, addDoc } from 'firebase/firestore';
+import MarkdownEditor from '../components/MarkdownEditor.vue';
+
+interface User {
+  uid: string;
+  email: string | null;
+}
 
 export default defineComponent({
-  name: 'CreateHospitalEntry',
   components: {
     MarkdownEditor
   },
   setup() {
-    const hospitalDetails = ref({
-      name: '',
-      markdown: ''
-    })
+    const hospitalName = ref('');
+    const hospitalDetails = ref('');
+    const currentUser = ref<User | null>(null);
+    const router = useRouter();
 
-    const saveEntry = async () => {
-      try {
-        await addDoc(collection(db, 'hospitals'), {
-          name: hospitalDetails.value.name,
-          markdown: hospitalDetails.value.markdown
-        })
-        console.log('Hospital entry saved successfully')
-      } catch (error) {
-        console.error('Error saving hospital entry: ', error)
+    // Check current user when component mounts
+    onMounted(() => {
+      const user = auth.currentUser;
+      if (user) {
+        currentUser.value = { uid: user.uid, email: user.email };
+      } else {
+        currentUser.value = null;
       }
-    }
+    });
+
+    const submitEntry = async () => {
+      try {
+        const user = auth.currentUser;
+        if (!user) {
+          alert('Please log in to create hospital entries.');
+          return;
+        }
+
+        console.log('Current user:', user);
+
+        const userQuery = query(collection(db, 'users'), where('uid', '==', user.uid));
+        const querySnapshot = await getDocs(userQuery);
+
+        let isAdmin = false;
+
+        querySnapshot.forEach((doc) => {
+          console.log('User document data:', doc.data());
+          if (doc.data().role === 'admin') {
+            isAdmin = true;
+          }
+        });
+
+        if (isAdmin) {
+          await addDoc(collection(db, 'hospitals'), {
+            name: hospitalName.value,
+            details: hospitalDetails.value,
+            createdBy: user.uid,
+            createdAt: new Date()
+          });
+          router.push('/hospital-search');
+        } else {
+          alert('You are not authorized to create hospital entries.');
+        }
+      } catch (error) {
+        console.error('Error creating hospital entry:', error);
+        alert('An error occurred while creating the hospital entry. Please try again.');
+      }
+    };
 
     return {
+      hospitalName,
       hospitalDetails,
-      saveEntry
-    }
+      currentUser,
+      submitEntry
+    };
   }
-})
+});
 </script>

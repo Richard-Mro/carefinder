@@ -2,8 +2,11 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /hospitals/{document=**} {
-      // Allow read if the user is authenticated
-      allow read, write: if true;
+      // Allow read access to anyone
+      allow read: if true;
+      
+      // Allow write access only if the user is authenticated and their role is 'admin'
+      allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
   }
 }

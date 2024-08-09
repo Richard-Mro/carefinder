@@ -1,21 +1,19 @@
 <template>
-  <div>
-    <!-- Toast UI Editor Container -->
-    <div ref="editorContainer" class="editor-container"></div>
-  </div>
+  <div ref="editorContainer" class="editor-container"></div>
 </template>
 
 <script lang="ts">
 import { defineComponent, onMounted, ref, watch } from 'vue';
-import { Editor } from '@toast-ui/editor'; // Import Toast UI Editor
+import '@toast-ui/editor/dist/toastui-editor.css';
+import { Editor } from '@toast-ui/editor';
 
 export default defineComponent({
   name: 'MarkdownEditor',
   props: {
     modelValue: {
       type: String,
-      default: '',
-    },
+      default: ''
+    }
   },
   emits: ['update:modelValue'],
   setup(props, { emit }) {
@@ -29,10 +27,9 @@ export default defineComponent({
           height: '500px',
           initialEditType: 'markdown',
           previewStyle: 'vertical',
-          initialValue: props.modelValue,
+          initialValue: props.modelValue
         });
 
-        // Use editor event to emit changes
         editor.on('change', () => {
           emit('update:modelValue', editor?.getMarkdown());
         });
@@ -50,9 +47,9 @@ export default defineComponent({
     );
 
     return {
-      editorContainer,
+      editorContainer
     };
-  },
+  }
 });
 </script>
 

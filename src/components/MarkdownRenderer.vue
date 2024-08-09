@@ -3,34 +3,38 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, onMounted, ref } from 'vue'
-import { Editor } from '@toast-ui/editor'
+import { defineComponent, onMounted, ref } from 'vue';
+import { Editor } from '@toast-ui/editor';
 
 export default defineComponent({
   name: 'MarkdownRenderer',
   props: {
     markdown: {
       type: String,
-      required: true
-    }
+      required: true,
+    },
   },
   setup(props) {
-    const editorContainer = ref<HTMLDivElement | null>(null)
+    const editorContainer = ref<HTMLDivElement | null>(null);
 
     onMounted(() => {
-      if (editorContainer.value) {
-        new Editor({
-          el: editorContainer.value,
-          initialEditType: 'markdown',
-          previewStyle: 'vertical',
-          initialValue: props.markdown
-        })
+      try {
+        if (editorContainer.value) {
+          new Editor({
+            el: editorContainer.value,
+            initialEditType: 'markdown',
+            previewStyle: 'vertical',
+            initialValue: props.markdown,
+          });
+        }
+      } catch (error) {
+        console.error('Error initializing Toast UI Editor:', error);
       }
-    })
+    });
 
     return {
-      editorContainer
-    }
-  }
-})
+      editorContainer,
+    };
+  },
+});
 </script>
