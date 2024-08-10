@@ -3,21 +3,18 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
-  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   fetchSignInMethodsForEmail,
   linkWithCredential,
   EmailAuthProvider,
   GoogleAuthProvider,
   FacebookAuthProvider,
-  AuthError,
-  UserCredential
+  AuthError // Import the AuthError class from Firebase
 } from 'firebase/auth'
 
 // Register user with email and password
-export const registerWithEmailAndPassword = async (
-  email: string,
-  password: string
-): Promise<UserCredential['user']> => {
+export const registerWithEmailAndPassword = async (email: string, password: string) => {
   try {
     const userCredential = await createUserWithEmailAndPassword(firebaseAuth, email, password)
     return userCredential.user
@@ -28,10 +25,7 @@ export const registerWithEmailAndPassword = async (
 }
 
 // Login user with email and password
-export const loginWithEmailAndPassword = async (
-  email: string,
-  password: string
-): Promise<UserCredential['user']> => {
+export const loginWithEmailAndPassword = async (email: string, password: string) => {
   try {
     const userCredential = await signInWithEmailAndPassword(firebaseAuth, email, password)
     return userCredential.user
@@ -41,32 +35,43 @@ export const loginWithEmailAndPassword = async (
   }
 }
 
-// Social Media Login - Google
-export const loginWithGoogle = async (): Promise<UserCredential['user']> => {
+// Social Media Login - Google (Redirect)
+export const loginWithGoogle = async () => {
   try {
-    await preventMultiplePopups()
-    const userCredential = await signInWithPopup(firebaseAuth, googleProvider)
-    return userCredential.user
+    await signInWithRedirect(firebaseAuth, googleProvider)
   } catch (error) {
-    await handlePopupError(error, googleProvider)
+    console.error('Error during Google login redirect:', error)
     throw error
   }
 }
 
-// Social Media Login - Facebook
-export const loginWithFacebook = async (): Promise<UserCredential['user']> => {
+// Social Media Login - Facebook (Redirect)
+export const loginWithFacebook = async () => {
   try {
-    await preventMultiplePopups()
-    const userCredential = await signInWithPopup(firebaseAuth, facebookProvider)
-    return userCredential.user
+    await signInWithRedirect(firebaseAuth, facebookProvider)
   } catch (error) {
-    await handlePopupError(error, facebookProvider)
+    console.error('Error during Facebook login redirect:', error)
+    throw error
+  }
+}
+
+// Handle Redirect Result after returning to app
+export const handleRedirectResult = async () => {
+  try {
+    const result = await getRedirectResult(firebaseAuth)
+    if (result && result.user) {
+      return result.user
+    } else {
+      throw new Error('No user found in the redirect result.')
+    }
+  } catch (error) {
+    await handleRedirectError(error as AuthError)
     throw error
   }
 }
 
 // Logout user
-export const logout = async (): Promise<void> => {
+export const logout = async () => {
   try {
     await signOut(firebaseAuth)
   } catch (error) {
@@ -76,7 +81,7 @@ export const logout = async (): Promise<void> => {
 }
 
 // Check if user is authenticated
-export const isAuthenticated = (): boolean => {
+export const isAuthenticated = () => {
   return firebaseAuth.currentUser !== null
 }
 
@@ -85,22 +90,10 @@ export const getCurrentUser = () => {
   return firebaseAuth.currentUser
 }
 
-// Prevent multiple popups from being opened simultaneously
-const preventMultiplePopups = (): void => {
-  if (firebaseAuth.currentUser) {
-    throw new Error('A user is already authenticated.')
-  }
-}
-
-// Handle errors during popup-based authentication
-const handlePopupError = async (
-  error: unknown,
-  provider: GoogleAuthProvider | FacebookAuthProvider
-): Promise<void> => {
-  const err = error as AuthError
-
-  if (err.code === 'auth/account-exists-with-different-credential') {
-    const email = err.customData?.email
+// Handle errors during redirect-based authentication
+const handleRedirectError = async (error: AuthError) => {
+  if (error.message.includes('auth/account-exists-with-different-credential')) {
+    const email = error.customData?.email
 
     if (email) {
       // Fetch sign-in methods for this email
@@ -111,17 +104,16 @@ const handlePopupError = async (
         const password = prompt(
           `An account already exists with this email. Please enter your password for ${email}:`
         )
-
         if (password) {
           try {
             const credential = EmailAuthProvider.credential(email, password)
             const userCredential = await signInWithEmailAndPassword(firebaseAuth, email, password)
             let oauthCredential
 
-            if (provider instanceof GoogleAuthProvider) {
-              oauthCredential = GoogleAuthProvider.credentialFromError(err)
-            } else if (provider instanceof FacebookAuthProvider) {
-              oauthCredential = FacebookAuthProvider.credentialFromError(err)
+            if (googleProvider instanceof GoogleAuthProvider) {
+              oauthCredential = GoogleAuthProvider.credentialFromError(error)
+            } else if (facebookProvider instanceof FacebookAuthProvider) {
+              oauthCredential = FacebookAuthProvider.credentialFromError(error)
             }
 
             if (oauthCredential) {
@@ -144,7 +136,7 @@ const handlePopupError = async (
       }
     }
   } else {
-    console.error('Error during popup-based authentication:', err)
+    console.error('Error during redirect-based authentication:', error)
     alert('An error occurred during authentication. Please try again.')
   }
 }
