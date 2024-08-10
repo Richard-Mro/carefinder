@@ -21,7 +21,7 @@
 import { defineComponent, ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { auth, googleProvider, facebookProvider } from '@/firebase';
-import { signInWithEmailAndPassword, signInWithPopup, signInWithCredential, GoogleAuthProvider } from 'firebase/auth';
+import { signInWithEmailAndPassword, signInWithPopup, signInWithCredential, GoogleAuthProvider, FacebookAuthProvider } from 'firebase/auth';
 import { FirebaseError } from 'firebase/app';
 
 declare global {
@@ -50,12 +50,14 @@ export default defineComponent({
     // Google Login Method (Traditional Button)
     const loginWithGoogle = async () => {
       try {
-        await signInWithPopup(auth, googleProvider);
-        router.push('/hospital-search'); // Redirect after successful login
+        const result = await signInWithPopup(auth, googleProvider);
+        const credential = GoogleAuthProvider.credentialFromResult(result);
+        if (credential) {
+          await signInWithCredential(auth, credential);
+          router.push('/hospital-search');
+        }
       } catch (error: unknown) {
-        const err = error as FirebaseError;
-        console.error('Error logging in with Google', err);
-        alert(err.message);
+        handleAuthError(error);
       }
     };
 
@@ -65,13 +67,13 @@ export default defineComponent({
         window.google.accounts.id.initialize({
           client_id: process.env.VUE_APP_GOOGLE_CLIENT_ID || '',
           callback: handleGoogleCredentialResponse,
-          cancel_on_tap_outside: false, // Optional: Prevents the popup from closing when clicking outside
+          cancel_on_tap_outside: false,
         });
         window.google.accounts.id.renderButton(googleSignInButton.value, {
           theme: 'outline',
           size: 'large',
         });
-        window.google.accounts.id.prompt(); // Optional: Automatically prompts the user
+        window.google.accounts.id.prompt();
       }
     });
 
@@ -82,21 +84,21 @@ export default defineComponent({
         await signInWithCredential(auth, credential);
         router.push('/hospital-search');
       } catch (error: unknown) {
-        const err = error as FirebaseError;
-        console.error('Error logging in with Google', err);
-        alert(err.message);
+        handleAuthError(error);
       }
     };
 
     // Facebook Login Method
     const loginWithFacebook = async () => {
       try {
-        await signInWithPopup(auth, facebookProvider);
-        router.push('/hospital-search'); // Redirect after successful login
+        const result = await signInWithPopup(auth, facebookProvider);
+        const credential = FacebookAuthProvider.credentialFromResult(result);
+        if (credential) {
+          await signInWithCredential(auth, credential);
+          router.push('/hospital-search');
+        }
       } catch (error: unknown) {
-        const err = error as FirebaseError;
-        console.error('Error logging in with Facebook', err);
-        alert(err.message);
+        handleAuthError(error);
       }
     };
 
