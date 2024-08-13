@@ -6,18 +6,21 @@ import ShareHospitals from '../views/shareHospitals.vue'
 import CreateHospitalEntry from '../views/CreateHospitalEntry.vue'
 import ViewHospitalEntry from '../views/viewHospitalEntry.vue'
 import NotAuthorized from '../views/NotAuthorized.vue'
-import AdminPanel from '../views/AdminPanel.vue' // Import the AdminPanel component
-import authMiddleware from '../authMiddleware' // Import the middleware
+import AdminPanel from '../views/AdminPanel.vue'
+import RequestAdmin from '../views/RequestAdmin.vue'
+import AdminRequests from '../views/AdminRequests.vue'
+import Home from '../views/Home.vue' // Import the Home component
+import authMiddleware from '../authMiddleware'
 import { auth } from '../firebase'
 
 const routes = [
+  { path: '/', name: 'Home', component: Home }, // Default route
   { path: '/signup', name: 'Signup', component: Signup },
   { path: '/login', name: 'Login', component: Login },
   {
     path: '/hospital-search',
     name: 'HospitalSearch',
-    component: HospitalSearch,
-    meta: { requiresAuth: true } // Protected route
+    component: HospitalSearch
   },
   {
     path: '/share',
@@ -28,23 +31,34 @@ const routes = [
     path: '/create-hospital',
     name: 'CreateHospitalEntry',
     component: CreateHospitalEntry,
-    meta: { requiresAuth: true } // Protected route
+    meta: { requiresAuth: true }
   },
   {
     path: '/hospitals/:id',
     name: 'ViewHospitalEntry',
     component: ViewHospitalEntry,
-    meta: { requiresAuth: true }, // Protected route
-    props: true // Pass route params as props to the component
+    meta: { requiresAuth: true },
+    props: true
   },
   {
-    path: '/admin-panel', // New route for AdminPanel
+    path: '/admin-panel',
     name: 'AdminPanel',
     component: AdminPanel,
-    meta: { requiresAuth: true, requiresAdmin: true } // Protected route with admin check
+    meta: { requiresAuth: true, requiresAdmin: true }
   },
-  { path: '/not-authorized', name: 'NotAuthorized', component: NotAuthorized },
-  { path: '/', redirect: '/signup' } // Redirect to signup as default route
+  {
+    path: '/request-admin',
+    name: 'RequestAdmin',
+    component: RequestAdmin,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/admin-requests',
+    name: 'AdminRequests',
+    component: AdminRequests,
+    meta: { requiresAuth: true, requiresAdmin: true }
+  },
+  { path: '/not-authorized', name: 'NotAuthorized', component: NotAuthorized }
 ]
 
 const router = createRouter({
@@ -52,7 +66,6 @@ const router = createRouter({
   routes
 })
 
-// Navigation guard to protect routes based on authentication and roles
 router.beforeEach(async (to, from, next) => {
   const requiresAuth = to.matched.some((record) => record.meta.requiresAuth)
   const requiresAdmin = to.matched.some((record) => record.meta.requiresAdmin)
@@ -63,13 +76,13 @@ router.beforeEach(async (to, from, next) => {
   } else if (requiresAuth && user) {
     try {
       if (requiresAdmin) {
-        await authMiddleware(to, from, next) // Check if user is an admin
+        await authMiddleware(to, from, next)
       } else {
         next()
       }
     } catch (error) {
       console.error('Middleware error:', error)
-      next('/not-authorized') // Redirect to not authorized page in case of error
+      next('/not-authorized')
     }
   } else {
     next()

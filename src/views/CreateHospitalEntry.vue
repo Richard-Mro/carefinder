@@ -4,7 +4,7 @@
     <p v-if="currentUser">Logged in as: {{ currentUser.email }}</p>
     <p v-else>Please log in.</p>
     <form @submit.prevent="submitEntry">
-      <input v-model="hospitalName" placeholder="Hospital Name" required />
+      <input v-model="hospitalName" placeholder="Insert Hospital Name.." required />
       <MarkdownEditor v-model="hospitalDetails" />
       <button type="submit">Submit</button>
     </form>

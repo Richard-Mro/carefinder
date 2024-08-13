@@ -1,15 +1,6 @@
 
 <template>
   <div id="app">
-    <header>
-      <h1>CareFinder</h1>
-      <nav>
-        <router-link to="/signup">Sign Up</router-link>
-        <router-link to="/login">Login</router-link>
-        <router-link to="/hospital-search">Hospital Search</router-link>
-        <router-link to="/create-hospital">Create Hospital Entry</router-link> <!-- Updated link -->     
-      </nav>
-    </header>
     <main>
       <router-view></router-view>
     </main>
