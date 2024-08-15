@@ -4,13 +4,18 @@ import * as logger from 'firebase-functions/logger'
 import { Request, Response } from 'express'
 import * as admin from 'firebase-admin'
 import * as csv from 'csv-writer'
+import { stringify } from 'csv-stringify'
 import * as nodemailer from 'nodemailer'
 import { v4 as uuidv4 } from 'uuid'
 import * as fs from 'fs'
 import * as path from 'path'
 import axios from 'axios'
+import * as cors from 'cors'
 
 admin.initializeApp()
+const bucket = admin.storage().bucket()
+const firestore = admin.firestore()
+const corsHandler = cors({ origin: true }) // CORS handler
 
 // Get Firebase Config
 export const getFirebaseConfig = onRequest((request: Request, response: Response) => {
@@ -28,139 +33,154 @@ export const getFirebaseConfig = onRequest((request: Request, response: Response
 })
 
 // Export Hospitals to CSV
-export const exportHospitalsToCSV = onRequest(
-  async (request: Request, response: Response): Promise<void> => {
-    try {
-      const hospitalsSnapshot = await admin.firestore().collection('hospitals').get()
-      const hospitals = hospitalsSnapshot.docs.map((doc) => doc.data())
+export const exportHospitalsToCSV = functions.https.onRequest(
+  async (req: Request, res: Response) => {
+    corsHandler(req, res, async () => {
+      try {
+        const hospitalsSnapshot = await firestore.collection('hospitals').get()
+        if (hospitalsSnapshot.empty) {
+          res.status(404).send('No hospitals found.')
+          return
+        }
 
-      const csvFileName = `hospitals_${uuidv4()}.csv`
-      const csvFilePath = path.join('/tmp', csvFileName)
+        const hospitals = hospitalsSnapshot.docs.map((doc) => doc.data())
+        const csvData = [['ID', 'Name', 'Address', 'Phone', 'Website']]
+        hospitals.forEach((hospital) => {
+          csvData.push([
+            hospital.id,
+            hospital.name,
+            hospital.address,
+            hospital.phone,
+            hospital.website
+          ])
+        })
 
-      const csvWriter = csv.createObjectCsvWriter({
-        path: csvFilePath,
-        header: [
-          { id: 'name', title: 'Name' },
-          { id: 'address', title: 'Address' },
-          { id: 'phone', title: 'Phone' },
-          { id: 'website', title: 'Website' }
-        ]
-      })
+        stringify(csvData, async (err, output) => {
+          if (err) {
+            res.status(500).send('Error generating CSV.')
+            return
+          }
 
-      await csvWriter.writeRecords(hospitals)
+          const csvFileName = `hospitals_${uuidv4()}.csv`
+          const filePath = path.join('/tmp', csvFileName)
+          fs.writeFileSync(filePath, output)
 
-      const bucket = admin.storage().bucket()
-      await bucket.upload(csvFilePath, {
-        destination: `exports/${csvFileName}`,
-        public: true
-      })
-
-      const fileUrl = `https://storage.googleapis.com/${bucket.name}/exports/${csvFileName}`
-
-      // Clean up temporary file
-      fs.unlinkSync(csvFilePath)
-
-      response.json({ success: true, url: fileUrl })
-    } catch (error) {
-      logger.error('Error exporting hospitals to CSV:', error)
-      response.status(500).json({ success: false, message: 'Failed to export hospitals.' })
-    }
+          try {
+            await bucket.upload(filePath, { destination: `exports/${csvFileName}`, public: true })
+            const fileUrl = `https://storage.googleapis.com/${bucket.name}/exports/${csvFileName}`
+            res.status(200).json({ url: fileUrl })
+          } catch (error) {
+            console.error('Error uploading CSV to bucket:', error)
+            res.status(500).send('Internal Server Error')
+          } finally {
+            fs.unlinkSync(filePath) // Clean up temporary file
+          }
+        })
+      } catch (error) {
+        console.error('Error exporting hospitals to CSV:', error)
+        res.status(500).send('Internal Server Error')
+      }
+    })
   }
 )
+
 
 // Share Hospitals via Email
 export const shareHospitalsViaEmail = onRequest(
   async (request: Request, response: Response): Promise<void> => {
-    try {
-      const { email, message } = request.body
+    corsHandler(request, response, async () => {
+      try {
+        const { email, message } = request.body
 
-      if (!email || !email.includes('@')) {
-        response.status(400).json({ success: false, message: 'Valid email is required.' })
-        return
-      }
-
-      const hospitalsSnapshot = await admin.firestore().collection('hospitals').get()
-      const hospitals = hospitalsSnapshot.docs.map((doc) => doc.data())
-
-      const csvFileName = `hospitals_${uuidv4()}.csv`
-      const csvFilePath = path.join('/tmp', csvFileName)
-
-      const csvWriter = csv.createObjectCsvWriter({
-        path: csvFilePath,
-        header: [
-          { id: 'name', title: 'Name' },
-          { id: 'address', title: 'Address' },
-          { id: 'phone', title: 'Phone' },
-          { id: 'website', title: 'Website' }
-        ]
-      })
-
-      await csvWriter.writeRecords(hospitals)
-
-      const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-          user: functions.config().email.user,
-          pass: functions.config().email.pass
+        if (!email || !email.includes('@')) {
+          response.status(400).json({ success: false, message: 'Valid email is required.' })
+          return
         }
-      })
 
-      await transporter.sendMail({
-        from: functions.config().email.user,
-        to: email,
-        subject: 'List of Hospitals',
-        text: message || 'Please find the list of hospitals attached.',
-        attachments: [
-          {
-            filename: csvFileName,
-            path: csvFilePath
+        const hospitalsSnapshot = await firestore.collection('hospitals').get()
+        const hospitals = hospitalsSnapshot.docs.map((doc) => doc.data())
+
+        const csvFileName = `hospitals_${uuidv4()}.csv`
+        const csvFilePath = path.join('/tmp', csvFileName)
+
+        const csvWriter = csv.createObjectCsvWriter({
+          path: csvFilePath,
+          header: [
+            { id: 'name', title: 'Name' },
+            { id: 'address', title: 'Address' },
+            { id: 'phone', title: 'Phone' },
+            { id: 'website', title: 'Website' }
+          ]
+        })
+
+        await csvWriter.writeRecords(hospitals)
+
+        const transporter = nodemailer.createTransport({
+          service: 'gmail',
+          auth: {
+            user: functions.config().email.user,
+            pass: functions.config().email.pass
           }
-        ]
-      })
+        })
 
-      // Clean up temporary file
-      fs.unlinkSync(csvFilePath)
+        await transporter.sendMail({
+          from: functions.config().email.user,
+          to: email,
+          subject: 'List of Hospitals',
+          text: message || 'Please find the list of hospitals attached.',
+          attachments: [
+            {
+              filename: csvFileName,
+              path: csvFilePath
+            }
+          ]
+        })
 
-      response.json({ success: true, message: 'Email sent successfully.' })
-    } catch (error) {
-      logger.error('Error sharing hospitals via email:', error)
-      response.status(500).json({ success: false, message: 'Failed to share hospitals.' })
-    }
+        // Clean up temporary file
+        fs.unlinkSync(csvFilePath)
+
+        response.json({ success: true, message: 'Email sent successfully.' })
+      } catch (error) {
+        logger.error('Error sharing hospitals via email:', error)
+        response.status(500).json({ success: false, message: 'Failed to share hospitals.' })
+      }
+    })
   }
 )
 
 // Generate Shareable Link
 export const generateShareableLink = onRequest(
   async (request: Request, response: Response): Promise<void> => {
-    try {
-      const { hospitalId } = request.body
+    corsHandler(request, response, async () => {
+      try {
+        const { hospitalId } = request.body
 
-      if (!hospitalId) {
-        response.status(400).json({ success: false, message: 'Hospital ID is required.' })
-        return
+        if (!hospitalId) {
+          response.status(400).json({ success: false, message: 'Hospital ID is required.' })
+          return
+        }
+
+        const doc = await firestore.collection('hospitals').doc(hospitalId).get()
+
+        if (!doc.exists) {
+          response.status(404).json({ success: false, message: 'Hospital not found.' })
+          return
+        }
+
+        const data = doc.data()
+        const hospitalName = data?.name || 'Unknown Hospital'
+
+        // Construct the dynamic link using the correct domain
+        const dynamicLink = `https://carefinder-70ff2.page.link/?link=https://carefinder-70ff2.web.app/hospitals/${hospitalId}&apn=com.example.android&ibi=com.example.ios&st=${encodeURIComponent(hospitalName)}`
+
+        response.json({ success: true, link: dynamicLink })
+      } catch (error) {
+        logger.error('Error generating shareable link:', error)
+        response.status(500).json({ success: false, message: 'Failed to generate shareable link.' })
       }
-
-      const doc = await admin.firestore().collection('hospitals').doc(hospitalId).get()
-
-      if (!doc.exists) {
-        response.status(404).json({ success: false, message: 'Hospital not found.' })
-        return
-      }
-
-      const data = doc.data()
-      const hospitalName = data?.name || 'Unknown Hospital'
-
-      // Construct the dynamic link using the correct domain
-      const dynamicLink = `https://carefinder-70ff2.page.link/?link=https://carefinder-70ff2.web.app/hospitals/${hospitalId}&apn=com.example.android&ibi=com.example.ios&st=${encodeURIComponent(hospitalName)}`
-
-      response.json({ success: true, link: dynamicLink })
-    } catch (error) {
-      logger.error('Error generating shareable link:', error)
-      response.status(500).json({ success: false, message: 'Failed to generate shareable link.' })
-    }
+    })
   }
 )
-
 
 // Generate Dynamic Link using Firebase Dynamic Links API
 export const generateDynamicLink = functions.https.onCall(
@@ -172,7 +192,7 @@ export const generateDynamicLink = functions.https.onCall(
 
     const dynamicLinkParams = {
       dynamicLinkInfo: {
-        domainUriPrefix: 'https://carefinder-70ff2.web.app',
+        domainUriPrefix: 'https://carefinder-70ff2.page.link',
         link: `https://carefinder-70ff2.web.app/hospitals/${hospitalId}`,
         androidInfo: {
           androidPackageName: 'com.example.android'

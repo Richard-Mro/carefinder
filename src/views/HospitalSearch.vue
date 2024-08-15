@@ -56,7 +56,9 @@ import { defineComponent, ref, computed, onMounted } from 'vue';
 import { searchHospitals, searchHospitalsNearby } from '@/services/hospitalService';
 import { getCurrentLocation } from '@/services/geolocationHelper';
 import { Hospital } from '@/api/types';
-import axios from 'axios';
+import { exportHospitals } from '@/services/exportHospitals';
+import { shareViaEmail } from '@/services/shareViaEmail';
+import { createDynamicLink } from '@/services/generateShareableLinks';
 
 export default defineComponent({
   name: 'HospitalSearch',
@@ -131,22 +133,18 @@ export default defineComponent({
       }
     };
 
-    const exportHospitals = async () => {
+    const exportHospitalsHandler = async () => {
       try {
         loading.value = true;
-        const response = await axios.get('/exportHospitalsToCSV');
-        const link = document.createElement('a');
-        link.href = response.data.url;
-        link.download = 'hospitals.csv';
-        link.click();
-      } catch (error: any) {
-        console.error('Error exporting hospitals:', error);
+        await exportHospitals();
+      } catch (error) {
+        alert('Failed to export hospitals.');
       } finally {
         loading.value = false;
       }
     };
 
-    const shareViaEmail = async () => {
+    const shareViaEmailHandler = async () => {
       const email = prompt('Enter email address:');
       if (!email) return;
 
@@ -154,34 +152,12 @@ export default defineComponent({
 
       try {
         loading.value = true;
-        const response = await axios.post('http://localhost:3000/api/shareHospitalsViaEmail', { recipientEmail: email, hospitalList });
-        console.log('Response from server:', response.data);
-        alert('Email sent successfully.');
+        const message = await shareViaEmail(email, hospitalList);
+        alert(message);
       } catch (error: any) {
-        console.error('Error sharing hospitals via email:', error);
-        alert('Failed to send email.');
+        alert(error.message);
       } finally {
         loading.value = false;
-      }
-    };
-
-    const createDynamicLink = async (hospitalId: string) => {
-      const apiKey = import.meta.env.VITE_APP_FIREBASE_API_KEY;
-
-      const longDynamicLink = `https://carefinder-70ff2.web.app/hospitals/${hospitalId}`;
-
-      try {
-        const response = await axios.post(`https://firebasedynamiclinks.googleapis.com/v1/shortLinks?key=${apiKey}`, {
-          longDynamicLink: `${longDynamicLink}?apn=com.example.android&ibi=com.example.ios`,
-          suffix: {
-            option: 'SHORT'
-          }
-        });
-
-        return response.data.shortLink;
-      } catch (error) {
-        console.error('Error creating dynamic link:', error);
-        throw error;
       }
     };
 
@@ -259,8 +235,8 @@ export default defineComponent({
       totalPages,
       performSearch,
       searchNearbyHospitals,
-      exportHospitals,
-      shareViaEmail,
+      exportHospitals: exportHospitalsHandler,
+      shareViaEmail: shareViaEmailHandler,
       generateShareableLink: generateShareableLinkHandler,
       loading,
       prevPage,
@@ -270,6 +246,7 @@ export default defineComponent({
   }
 });
 </script>
+
 
 
 <style scoped>

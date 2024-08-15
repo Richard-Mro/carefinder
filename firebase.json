@@ -2,12 +2,6 @@
   "hosting": {
     "public": "dist",
     "ignore": ["firebase.json", "**/.*", "**/dist/favicon.ico", "**/node_modules/**"],
-    "rewrites": [
-      {
-        "source": "**",
-        "destination": "/index.html"
-      }
-    ],
     "headers": [
       {
         "source": "**/*.mjs",
@@ -18,11 +12,17 @@
           }
         ]
       }
+    ],
+    "rewrites": [
+      {
+        "source": "!**/*.mjs",
+        "destination": "/index.html"
+      }
     ]
   },
   "firestore": {
-      "rules": "firestore.rules",
-      "indexes": "firestore.indexes.json"
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
   },
   "functions": {
     "source": "functions"
