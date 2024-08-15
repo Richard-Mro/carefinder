@@ -1,4 +1,4 @@
-import { db } from '../firebase.mjs'
+import { db } from '../firebase.server.mjs'
 import axios from 'axios'
 import { config } from 'dotenv'
 

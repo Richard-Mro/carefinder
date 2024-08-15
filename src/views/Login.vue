@@ -14,7 +14,7 @@
     </button>
     <button @click="loginWithFacebook" class="btn-facebook">
       Login with Facebook
-    </button> Haven't Registered ? <router-link to="/signup">SignUp</router-link>
+    </button> Not a User? <router-link to="/signup">SignUp</router-link>
   </div>
 </template>
 

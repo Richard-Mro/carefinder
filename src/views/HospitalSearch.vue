@@ -1,6 +1,5 @@
 <template>
   <div class="container">
-    <!-- Loading spinner -->
     <div v-if="loading" class="loading-overlay">
       <div class="spinner"></div>
     </div>
@@ -19,11 +18,23 @@
     <div class="action-buttons">
       <button @click="exportHospitals" class="action-button">Export to CSV</button>
       <button @click="shareViaEmail" class="action-button">Share via Email</button>
-      <button @click="generateShareableLink" class="action-button">Generate Shareable Link</button>
+      <button
+        v-if="selectedHospital"
+        @click="generateShareableLink(selectedHospital)"
+        class="action-button"
+      >
+        Generate Shareable Link
+      </button>
     </div>
 
     <ul v-if="!loading" class="hospital-list">
-      <li v-for="hospital in paginatedHospitals" :key="hospital.id" class="hospital-card">
+      <li
+        v-for="hospital in paginatedHospitals"
+        :key="hospital.id"
+        class="hospital-card"
+        @click="selectHospital(hospital)"
+        :class="{ selected: hospital === selectedHospital }"
+      >
         <h3>{{ hospital.name }}</h3>
         <p>ADDRESS: {{ hospital.address }}</p>
         <p>PHONE-NO: {{ hospital.phone }}</p>
@@ -37,48 +48,33 @@
     </div>
 
     <div id="map" class="map"></div>
-
-    <div v-if="showEditModal" class="modal">
-      <div class="modal-content">
-        <span class="close" @click="closeEditModal">&times;</span>
-        <h2>Edit Markdown Content</h2>
-        <textarea v-model="editedMarkdown" rows="10" cols="50"></textarea>
-        <button @click="saveMarkdown" class="save-button">Save</button>
-      </div>
-    </div>
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, computed, onMounted } from 'vue';
-import { searchHospitals, searchHospitalsNearby, updateHospitalMarkdown } from '@/services/hospitalService';
+import { searchHospitals, searchHospitalsNearby } from '@/services/hospitalService';
 import { getCurrentLocation } from '@/services/geolocationHelper';
 import { Hospital } from '@/api/types';
-import { exportHospitalsToCSV } from '@/utils/csvExporter';
-import { downloadCSV } from '@/utils/fileDownloader';
-import { generateShareableLink, composeEmailBody } from '@/utils/shareHelpers';
-import * as marked from 'marked';
+import axios from 'axios';
 
 export default defineComponent({
   name: 'HospitalSearch',
   setup() {
     const searchKeyword = ref('');
     const hospitals = ref<Hospital[]>([]);
+    const selectedHospital = ref<Hospital | null>(null);
     const currentPage = ref(1);
     const hospitalsPerPage = 2;
+    const loading = ref(false);
     const map = ref<google.maps.Map | null>(null);
     const markers: google.maps.Marker[] = [];
-    const showEditModal = ref(false);
-    const editedMarkdown = ref('');
-    const editingHospitalId = ref('');
-    const loading = ref(false);
 
     const filteredHospitals = computed(() => {
       const keyword = searchKeyword.value.toLowerCase();
       return hospitals.value.filter(hospital =>
         hospital.name.toLowerCase().includes(keyword) ||
-        hospital.address.toLowerCase().includes(keyword) ||
-        (hospital.markdown && hospital.markdown.toLowerCase().includes(keyword))
+        hospital.address.toLowerCase().includes(keyword)
       );
     });
 
@@ -92,6 +88,11 @@ export default defineComponent({
       return Math.ceil(filteredHospitals.value.length / hospitalsPerPage);
     });
 
+    const selectHospital = (hospital: Hospital) => {
+      selectedHospital.value = hospital;
+      console.log("Selected Hospital:", selectedHospital.value);
+    };
+
     const performSearch = async () => {
       loading.value = true;
       try {
@@ -99,7 +100,7 @@ export default defineComponent({
         hospitals.value = results as Hospital[];
         currentPage.value = 1;
         updateMapMarkers();
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error searching hospitals:', error);
       } finally {
         loading.value = false;
@@ -122,33 +123,89 @@ export default defineComponent({
         } else {
           throw new Error('Could not get current location.');
         }
-      } catch (error) {
-        const errorMessage = (error as Error).message;
-        console.error('Error getting current location:', errorMessage);
-        alert(errorMessage);
+      } catch (error: any) {
+        console.error('Error searching nearby hospitals:', error);
+        alert(error.message);
       } finally {
         loading.value = false;
       }
     };
 
-    const prevPage = () => {
-      if (currentPage.value > 1) {
-        currentPage.value--;
+    const exportHospitals = async () => {
+      try {
+        loading.value = true;
+        const response = await axios.get('/exportHospitalsToCSV');
+        const link = document.createElement('a');
+        link.href = response.data.url;
+        link.download = 'hospitals.csv';
+        link.click();
+      } catch (error: any) {
+        console.error('Error exporting hospitals:', error);
+      } finally {
+        loading.value = false;
       }
     };
 
-    const nextPage = () => {
-      if (currentPage.value < totalPages.value) {
-        currentPage.value++;
+    const shareViaEmail = async () => {
+      const email = prompt('Enter email address:');
+      if (!email) return;
+
+      const hospitalList = hospitals.value.map(hospital => hospital.name);
+
+      try {
+        loading.value = true;
+        const response = await axios.post('http://localhost:3000/api/shareHospitalsViaEmail', { recipientEmail: email, hospitalList });
+        console.log('Response from server:', response.data);
+        alert('Email sent successfully.');
+      } catch (error: any) {
+        console.error('Error sharing hospitals via email:', error);
+        alert('Failed to send email.');
+      } finally {
+        loading.value = false;
+      }
+    };
+
+    const createDynamicLink = async (hospitalId: string) => {
+      const apiKey = import.meta.env.VITE_APP_FIREBASE_API_KEY;
+
+      const longDynamicLink = `https://carefinder-70ff2.web.app/hospitals/${hospitalId}`;
+
+      try {
+        const response = await axios.post(`https://firebasedynamiclinks.googleapis.com/v1/shortLinks?key=${apiKey}`, {
+          longDynamicLink: `${longDynamicLink}?apn=com.example.android&ibi=com.example.ios`,
+          suffix: {
+            option: 'SHORT'
+          }
+        });
+
+        return response.data.shortLink;
+      } catch (error) {
+        console.error('Error creating dynamic link:', error);
+        throw error;
+      }
+    };
+
+    const generateShareableLinkHandler = async (hospital: Hospital) => {
+      try {
+        loading.value = true;
+
+        const dynamicLink = await createDynamicLink(hospital.id);
+        await navigator.clipboard.writeText(dynamicLink);
+        alert('Shareable link copied to clipboard!');
+      } catch (error: any) {
+        console.error('Error generating shareable link:', error);
+        alert('Failed to generate shareable link.');
+      } finally {
+        loading.value = false;
       }
     };
 
     const updateMapMarkers = () => {
       if (!map.value) return;
-      markers.forEach((marker) => marker.setMap(null));
+      markers.forEach(marker => marker.setMap(null));
       markers.length = 0;
 
-      paginatedHospitals.value.forEach((hospital) => {
+      paginatedHospitals.value.forEach(hospital => {
         const marker = new google.maps.Marker({
           position: { lat: hospital.location.latitude, lng: hospital.location.longitude },
           map: map.value,
@@ -158,53 +215,12 @@ export default defineComponent({
       });
     };
 
-    const exportHospitals = () => {
-      const csvContent = exportHospitalsToCSV(hospitals.value);
-      downloadCSV('hospitals.csv', csvContent);
+    const prevPage = () => {
+      if (currentPage.value > 1) currentPage.value--;
     };
 
-    const shareViaEmail = () => {
-      const emailBody = composeEmailBody(hospitals.value);
-      const mailtoLink = `mailto:?subject=Hospital Information&body=${encodeURIComponent(emailBody)}`;
-      window.location.href = mailtoLink;
-    };
-
-    const generateShareableLinkHandler = () => {
-      const shareableLink = generateShareableLink(hospitals.value);
-      navigator.clipboard.writeText(shareableLink).then(() => {
-        alert('Shareable link copied to clipboard!');
-      }, (err) => {
-        console.error('Failed to copy shareable link: ', err);
-      });
-    };
-
-    const hospitalContent = (markdown: string | undefined) => {
-      return markdown ? marked.parse(markdown) : '';
-    };
-
-    const openEditModal = (hospital: Hospital) => {
-      showEditModal.value = true;
-      editedMarkdown.value = hospital.markdown;
-      editingHospitalId.value = hospital.id;
-    };
-
-    const closeEditModal = () => {
-      showEditModal.value = false;
-      editedMarkdown.value = '';
-      editingHospitalId.value = '';
-    };
-
-    const saveMarkdown = async () => {
-      try {
-        await updateHospitalMarkdown(editingHospitalId.value, editedMarkdown.value);
-        const hospital = hospitals.value.find(h => h.id === editingHospitalId.value);
-        if (hospital) {
-          hospital.markdown = editedMarkdown.value;
-        }
-        closeEditModal();
-      } catch (error) {
-        console.error('Error saving markdown:', error);
-      }
+    const nextPage = () => {
+      if (currentPage.value < totalPages.value) currentPage.value++;
     };
 
     onMounted(async () => {
@@ -229,10 +245,6 @@ export default defineComponent({
         script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_APP_GOOGLE_MAPS_API_KEY}&callback=initMap`;
         script.async = true;
         script.defer = true;
-        script.onerror = () => {
-          console.error('Error loading Google Maps script');
-          alert('Error loading Google Maps. Please try again later.');
-        };
         document.head.appendChild(script);
       } else {
         window.initMap();
@@ -242,29 +254,25 @@ export default defineComponent({
     return {
       searchKeyword,
       paginatedHospitals,
+      selectedHospital,
       currentPage,
       totalPages,
       performSearch,
       searchNearbyHospitals,
-      prevPage,
-      nextPage,
       exportHospitals,
       shareViaEmail,
       generateShareableLink: generateShareableLinkHandler,
-      hospitalContent,
-      showEditModal,
-      editedMarkdown,
-      openEditModal,
-      closeEditModal,
-      saveMarkdown,
-      loading
+      loading,
+      prevPage,
+      nextPage,
+      selectHospital,
     };
   }
 });
 </script>
 
+
 <style scoped>
-/* Container Styles */
 .container {
   padding: 20px;
   display: flex;
@@ -282,106 +290,98 @@ export default defineComponent({
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 999;
+  z-index: 1000;
 }
 
 .spinner {
-  border: 8px solid rgba(255, 255, 255, 0.3);
-  border-top: 8px solid #ffffff;
+  border: 5px solid #f3f3f3;
   border-radius: 50%;
-  width: 60px;
-  height: 60px;
+  border-top: 5px solid #3498db;
+  width: 40px;
+  height: 40px;
   animation: spin 1s linear infinite;
 }
 
 @keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
-/* Search Bar */
 .search-bar {
   display: flex;
-  justify-content: center;
-  align-items: center;
   gap: 10px;
 }
 
 .search-input {
+  flex: 1;
   padding: 10px;
-  font-size: 16px;
-  width: 250px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+  border-radius: 5px;
+  border: 1px solid #ddd;
 }
 
 .search-nearby-button {
   padding: 10px 20px;
-  font-size: 16px;
-  background-color: #4CAF50;
-  color: white;
+  background-color: #3498db;
+  color: #fff;
   border: none;
-  border-radius: 4px;
+  border-radius: 5px;
   cursor: pointer;
 }
 
 .search-nearby-button:hover {
-  background-color: #45a049;
+  background-color: #2980b9;
 }
 
-/* Action Buttons */
 .action-buttons {
   display: flex;
-  justify-content: center;
   gap: 10px;
+  justify-content: flex-start;
 }
 
 .action-button {
   padding: 10px 20px;
-  font-size: 16px;
-  background-color: #008CBA;
-  color: white;
+  background-color: #3498db;
+  color: #fff;
   border: none;
-  border-radius: 4px;
+  border-radius: 5px;
   cursor: pointer;
 }
 
 .action-button:hover {
-  background-color: #007BB5;
+  background-color: #2980b9;
 }
 
-/* Hospital List */
 .hospital-list {
-  list-style-type: none;
+  list-style: none;
   padding: 0;
-  margin: 0;
 }
 
 .hospital-card {
+  padding: 15px;
   border: 1px solid #ddd;
-  padding: 20px;
+  border-radius: 5px;
   margin-bottom: 10px;
-  border-radius: 4px;
-  background-color: #f9f9f9;
+  background-color: #fff;
+  cursor: pointer;
+  transition: background-color 0.3s;
 }
 
-.hospital-card h3 {
-  margin: 0 0 10px;
+.hospital-card:hover {
+  background-color: #f5f5f5;
+}
+
+.hospital-card.selected {
+  background-color: #e0f7fa;
 }
 
 .website-link {
-  color: #007BB5;
+  color: #3498db;
 }
 
 .website-link:hover {
   text-decoration: underline;
 }
 
-/* Pagination */
 .pagination {
   display: flex;
   justify-content: center;
@@ -390,77 +390,24 @@ export default defineComponent({
 
 .pagination-button {
   padding: 10px 20px;
-  font-size: 16px;
-  background-color: #008CBA;
-  color: white;
+  background-color: #3498db;
+  color: #fff;
   border: none;
-  border-radius: 4px;
+  border-radius: 5px;
   cursor: pointer;
 }
 
 .pagination-button:disabled {
-  background-color: #ccc;
+  background-color: #bdc3c7;
   cursor: not-allowed;
 }
 
-.pagination-button:not(:disabled):hover {
-  background-color: #007BB5;
-}
-
-/* Map */
 .map {
-  width: 100%;
   height: 400px;
+  width: 100%;
   margin-top: 20px;
-  border-radius: 4px;
+  border-radius: 5px;
   border: 1px solid #ddd;
 }
-
-/* Modal */
-.modal {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
-  z-index: 1000;
-}
-
-.modal-content {
-  background-color: white;
-  padding: 20px;
-  border-radius: 8px;
-  width: 400px;
-  max-width: 100%;
-  position: relative;
-}
-
-.close {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  font-size: 20px;
-  cursor: pointer;
-}
-
-.save-button {
-  display: block;
-  width: 100%;
-  padding: 10px;
-  font-size: 16px;
-  background-color: #4CAF50;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  margin-top: 10px;
-}
-
-.save-button:hover {
-  background-color: #45a049;
-}
 </style>
+

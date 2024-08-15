@@ -5,7 +5,7 @@
       <input v-model="email" type="email" placeholder="Email" required />
       <input v-model="password" type="password" placeholder="Password" required />
       <button type="submit" class="btn-signup">Sign Up</button>
-    </form>Already Registered ? <router-link to="/login">Login</router-link>
+    </form>Already a User ? <router-link to="/login">Login</router-link>
   </div>
 </template>
 

@@ -1,6 +1,6 @@
 import { collection, query, where, getDocs, Firestore } from 'firebase/firestore'
 import { db } from '../firebase'
-import { doc, updateDoc } from 'firebase/firestore'
+import { doc, updateDoc, getDoc } from 'firebase/firestore'
 import { Hospital } from 'src/api/types'
 
 function getFirestoreCollection(db: Firestore | undefined, collectionName: string) {
@@ -47,6 +47,16 @@ export async function searchHospitals(keyword: string): Promise<Hospital[]> {
 export const updateHospitalMarkdown = async (id: string, markdown: string) => {
   const hospitalRef = doc(db, 'hospitals', id)
   await updateDoc(hospitalRef, { markdown })
+}
+export const getHospitalById = async (id: string): Promise<Hospital | null> => {
+  const docRef = doc(db, 'hospitals', id)
+  const docSnap = await getDoc(docRef)
+
+  if (docSnap.exists()) {
+    return docSnap.data() as Hospital
+  } else {
+    return null
+  }
 }
 
 export async function searchHospitalsNearby(lat: number, lng: number): Promise<Hospital[]> {

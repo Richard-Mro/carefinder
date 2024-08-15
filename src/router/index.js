@@ -3,8 +3,8 @@ import Signup from '../views/signUp.vue'
 import Login from '../views/Login.vue'
 import HospitalSearch from '../views/HospitalSearch.vue'
 import ShareHospitals from '../views/shareHospitals.vue'
+import HospitalDetail from '../views/HospitalDetail.vue'
 import CreateHospitalEntry from '../views/CreateHospitalEntry.vue'
-import ViewHospitalEntry from '../views/viewHospitalEntry.vue'
 import NotAuthorized from '../views/NotAuthorized.vue'
 import AdminPanel from '../views/AdminPanel.vue'
 import RequestAdmin from '../views/RequestAdmin.vue'
@@ -35,9 +35,8 @@ const routes = [
   },
   {
     path: '/hospitals/:id',
-    name: 'ViewHospitalEntry',
-    component: ViewHospitalEntry,
-    meta: { requiresAuth: true },
+    name: 'HospitalDetail',
+    component: HospitalDetail,
     props: true
   },
   {

@@ -1,12 +1,10 @@
 <template>
   <div>
     <h1>Create Hospital Entry</h1>
-    <p v-if="currentUser">Logged in as: {{ currentUser.email }}</p>
-    <p v-else>Please log in.</p>
     <form @submit.prevent="submitEntry">
       <input v-model="hospitalName" placeholder="Insert Hospital Name.." required />
       <MarkdownEditor v-model="hospitalDetails" />
-      <button type="submit">Submit</button>
+      <button type="submit">Create</button>
     </form>
   </div>
 </template>
@@ -72,7 +70,7 @@ export default defineComponent({
             createdBy: user.uid,
             createdAt: new Date()
           });
-          router.push('/hospital-search');
+          router.push('/create-hospital');
         } else {
           alert('You are not authorized to create hospital entries.');
         }

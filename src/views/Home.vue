@@ -15,7 +15,7 @@
         </p>
       </div>
       <div class="feature">
-        <h2>Google Map</h2>
+        <h2>Map</h2>
         <p>
           A Map to guide you
         </p>
