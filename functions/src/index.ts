@@ -70,20 +70,21 @@ export const exportHospitalsToCSV = functions.https.onRequest(
             const fileUrl = `https://storage.googleapis.com/${bucket.name}/exports/${csvFileName}`
             res.status(200).json({ url: fileUrl })
           } catch (error) {
-            console.error('Error uploading CSV to bucket:', error)
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+            console.error('Error uploading CSV to bucket:', errorMessage)
             res.status(500).send('Internal Server Error')
           } finally {
             fs.unlinkSync(filePath) // Clean up temporary file
           }
         })
       } catch (error) {
-        console.error('Error exporting hospitals to CSV:', error)
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        console.error('Error exporting hospitals to CSV:', errorMessage)
         res.status(500).send('Internal Server Error')
       }
     })
   }
 )
-
 
 // Share Hospitals via Email
 export const shareHospitalsViaEmail = onRequest(
@@ -141,7 +142,8 @@ export const shareHospitalsViaEmail = onRequest(
 
         response.json({ success: true, message: 'Email sent successfully.' })
       } catch (error) {
-        logger.error('Error sharing hospitals via email:', error)
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        logger.error('Error sharing hospitals via email:', errorMessage)
         response.status(500).json({ success: false, message: 'Failed to share hospitals.' })
       }
     })
@@ -175,7 +177,8 @@ export const generateShareableLink = onRequest(
 
         response.json({ success: true, link: dynamicLink })
       } catch (error) {
-        logger.error('Error generating shareable link:', error)
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        logger.error('Error generating shareable link:', errorMessage)
         response.status(500).json({ success: false, message: 'Failed to generate shareable link.' })
       }
     })
@@ -200,6 +203,9 @@ export const generateDynamicLink = functions.https.onCall(
         iosInfo: {
           iosBundleId: 'com.example.ios'
         }
+      },
+      suffix: {
+        option: 'SHORT'
       }
     }
 
@@ -212,7 +218,8 @@ export const generateDynamicLink = functions.https.onCall(
       const shortLink = response.data.shortLink
       return { shortLink }
     } catch (error) {
-      console.error('Error generating dynamic link:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      console.error('Error generating dynamic link:', errorMessage)
       throw new functions.https.HttpsError('internal', 'Failed to generate dynamic link.')
     }
   }
