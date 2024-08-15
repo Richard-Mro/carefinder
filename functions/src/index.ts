@@ -150,7 +150,8 @@ export const generateShareableLink = onRequest(
       const data = doc.data()
       const hospitalName = data?.name || 'Unknown Hospital'
 
-      const dynamicLink = `https://your-app.page.link/?link=https://your-app.com/hospital/${hospitalId}&apn=com.example.android&ibi=com.example.ios&st=${encodeURIComponent(hospitalName)}`
+      // Construct the dynamic link using the correct domain
+      const dynamicLink = `https://carefinder-70ff2.page.link/?link=https://carefinder-70ff2.web.app/hospitals/${hospitalId}&apn=com.example.android&ibi=com.example.ios&st=${encodeURIComponent(hospitalName)}`
 
       response.json({ success: true, link: dynamicLink })
     } catch (error) {
@@ -159,6 +160,7 @@ export const generateShareableLink = onRequest(
     }
   }
 )
+
 
 // Generate Dynamic Link using Firebase Dynamic Links API
 export const generateDynamicLink = functions.https.onCall(
@@ -170,8 +172,8 @@ export const generateDynamicLink = functions.https.onCall(
 
     const dynamicLinkParams = {
       dynamicLinkInfo: {
-        domainUriPrefix: 'https://yourcustom.page.link',
-        link: `https://yourdomain.com/hospital/${hospitalId}`,
+        domainUriPrefix: 'https://carefinder-70ff2.web.app',
+        link: `https://carefinder-70ff2.web.app/hospitals/${hospitalId}`,
         androidInfo: {
           androidPackageName: 'com.example.android'
         },
