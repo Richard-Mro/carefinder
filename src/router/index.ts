@@ -1,20 +1,21 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router'
 import Signup from '../views/signUp.vue'
 import Login from '../views/Login.vue'
 import HospitalSearch from '../views/HospitalSearch.vue'
-import ShareHospitals from '../views/shareHospitals.vue'
+import FilteredHospitals from '../views/FilteredHospitals.vue'
 import HospitalDetail from '../views/HospitalDetail.vue'
 import CreateHospitalEntry from '../views/CreateHospitalEntry.vue'
 import NotAuthorized from '../views/NotAuthorized.vue'
 import AdminPanel from '../views/AdminPanel.vue'
 import RequestAdmin from '../views/RequestAdmin.vue'
 import AdminRequests from '../views/AdminRequests.vue'
-import Home from '../views/Home.vue' // Import the Home component
+import AllHospitals from '../views/AllHospitals.vue'
+import Home from '../views/Home.vue'
 import authMiddleware from '../authMiddleware'
 import { auth } from '../firebase'
 
-const routes = [
-  { path: '/', name: 'Home', component: Home }, // Default route
+const routes: Array<RouteRecordRaw> = [
+  { path: '/', name: 'Home', component: Home },
   { path: '/signup', name: 'Signup', component: Signup },
   { path: '/login', name: 'Login', component: Login },
   {
@@ -23,9 +24,12 @@ const routes = [
     component: HospitalSearch
   },
   {
-    path: '/share',
-    name: 'ShareHospitals',
-    component: ShareHospitals
+    path: '/filtered-hospitals',
+    name: 'FilteredHospitals',
+    component: () => import('../views/FilteredHospitals.vue'),
+    props: (route) => ({
+      data: route.query.data ? JSON.parse(decodeURIComponent(route.query.data as string)) : []
+    })
   },
   {
     path: '/create-hospital',
@@ -50,6 +54,11 @@ const routes = [
     name: 'RequestAdmin',
     component: RequestAdmin,
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/all-hospitals',
+    name: 'AllHospitals',
+    component: AllHospitals
   },
   {
     path: '/admin-requests',

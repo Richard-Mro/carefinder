@@ -3,7 +3,7 @@ import axios from 'axios'
 export const exportHospitals = async () => {
   try {
     const response = await axios.get(
-      'https://carefinder-70ff2.cloudfunctions.net/exportHospitalsToCSV'
+      'https://us-central1-carefinder-70ff2.cloudfunctions.net/exportHospitalsToCSV'
     )
     if (response.data.url) {
       window.open(response.data.url, '_blank')

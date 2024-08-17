@@ -1,8 +1,17 @@
-import { collection, query, where, getDocs, Firestore } from 'firebase/firestore'
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  doc,
+  updateDoc,
+  getDoc,
+  Firestore
+} from 'firebase/firestore'
 import { db } from '../firebase'
-import { doc, updateDoc, getDoc } from 'firebase/firestore'
 import { Hospital } from 'src/api/types'
 
+// Helper function to get a Firestore collection
 function getFirestoreCollection(db: Firestore | undefined, collectionName: string) {
   if (!db) {
     throw new Error('Firestore is not initialized.')
@@ -10,13 +19,47 @@ function getFirestoreCollection(db: Firestore | undefined, collectionName: strin
   return collection(db, collectionName)
 }
 
+// Function to fetch all hospitals
+export const getAllHospitals = async (): Promise<Hospital[]> => {
+  const hospitalsRef = getFirestoreCollection(db, 'hospitals')
+  const snapshot = await getDocs(hospitalsRef)
+  const hospitals: Hospital[] = []
+
+  snapshot.forEach((doc) => {
+    const data = doc.data()
+    hospitals.push({
+      id: doc.id,
+      name: data.name || 'Unknown',
+      address: data.address || 'Unknown',
+      phone: data.phone || 'N/A',
+      website: data.website || 'N/A',
+      markdown: data.markdown || 'N/A',
+      location: {
+        latitude: data.latitude ?? 0,
+        longitude: data.longitude ?? 0
+      }
+    })
+  })
+
+  return hospitals
+}
+
+// Function to fetch a single hospital by ID
+export const getHospitalById = async (id: string): Promise<Hospital | null> => {
+  const docRef = doc(db, 'hospitals', id)
+  const docSnap = await getDoc(docRef)
+
+  if (docSnap.exists()) {
+    return docSnap.data() as Hospital
+  } else {
+    return null
+  }
+}
+
+// Function to search hospitals by keyword
 export async function searchHospitals(keyword: string): Promise<Hospital[]> {
   const hospitalsRef = getFirestoreCollection(db, 'hospitals')
-
-  // Convert keyword to lowercase for case-insensitive search
   const lowerCaseKeyword = keyword.toLowerCase()
-
-  // Retrieve all documents and filter locally (case-insensitive)
   const snapshot = await getDocs(hospitalsRef)
   const hospitals: Hospital[] = []
 
@@ -32,7 +75,7 @@ export async function searchHospitals(keyword: string): Promise<Hospital[]> {
         address: data.address || 'Unknown',
         phone: data.phone || 'N/A',
         website: data.website || 'N/A',
-        markdown: data.markdown ||'N/A',
+        markdown: data.markdown || 'N/A',
         location: {
           latitude: data.latitude ?? 0,
           longitude: data.longitude ?? 0
@@ -44,21 +87,13 @@ export async function searchHospitals(keyword: string): Promise<Hospital[]> {
   return hospitals
 }
 
+// Function to update a hospital's markdown
 export const updateHospitalMarkdown = async (id: string, markdown: string) => {
   const hospitalRef = doc(db, 'hospitals', id)
   await updateDoc(hospitalRef, { markdown })
 }
-export const getHospitalById = async (id: string): Promise<Hospital | null> => {
-  const docRef = doc(db, 'hospitals', id)
-  const docSnap = await getDoc(docRef)
 
-  if (docSnap.exists()) {
-    return docSnap.data() as Hospital
-  } else {
-    return null
-  }
-}
-
+// Function to search nearby hospitals
 export async function searchHospitalsNearby(lat: number, lng: number): Promise<Hospital[]> {
   const hospitalsRef = getFirestoreCollection(db, 'hospitals')
   const radius = 10 // Radius in kilometers
@@ -106,6 +141,7 @@ export async function searchHospitalsNearby(lat: number, lng: number): Promise<H
   return hospitals
 }
 
+// Helper function to check if a hospital is within the radius
 function isNearby(
   hospitalLat: number,
   hospitalLng: number,

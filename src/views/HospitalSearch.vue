@@ -18,12 +18,8 @@
     <div class="action-buttons">
       <button @click="exportHospitals" class="action-button">Export to CSV</button>
       <button @click="shareViaEmail" class="action-button">Share via Email</button>
-      <button
-        v-if="selectedHospital"
-        @click="generateShareableLink(selectedHospital)"
-        class="action-button"
-      >
-        Generate Shareable Link
+      <button @click="generateShareableLinkForFilteredHospitalsHandler" class="action-button">
+        Generate Shareable Link for Filtered Hospitals
       </button>
     </div>
 
@@ -53,12 +49,13 @@
 
 <script lang="ts">
 import { defineComponent, ref, computed, onMounted } from 'vue';
+// Import other necessary services
 import { searchHospitals, searchHospitalsNearby } from '@/services/hospitalService';
 import { getCurrentLocation } from '@/services/geolocationHelper';
 import { Hospital } from '@/api/types';
 import { exportHospitals } from '@/services/exportHospitals';
 import { shareViaEmail } from '@/services/shareViaEmail';
-import { createDynamicLink } from '@/services/generateShareableLinks';
+import axios from 'axios';
 
 export default defineComponent({
   name: 'HospitalSearch',
@@ -71,6 +68,7 @@ export default defineComponent({
     const loading = ref(false);
     const map = ref<google.maps.Map | null>(null);
     const markers: google.maps.Marker[] = [];
+    const location = ref<{ latitude: number; longitude: number } | null>(null);
 
     const filteredHospitals = computed(() => {
       const keyword = searchKeyword.value.toLowerCase();
@@ -92,33 +90,33 @@ export default defineComponent({
 
     const selectHospital = (hospital: Hospital) => {
       selectedHospital.value = hospital;
-      console.log("Selected Hospital:", selectedHospital.value);
     };
 
     const performSearch = async () => {
-      loading.value = true;
-      try {
-        const results = await searchHospitals(searchKeyword.value.toLowerCase());
-        hospitals.value = results as Hospital[];
-        currentPage.value = 1;
-        updateMapMarkers();
-      } catch (error: any) {
-        console.error('Error searching hospitals:', error);
-      } finally {
-        loading.value = false;
-      }
-    };
+  loading.value = true;
+  try {
+    const results = await searchHospitals(searchKeyword.value.toLowerCase());
+    hospitals.value = results as Hospital[];
+    currentPage.value = 1;
+    updateMapMarkers();
+  } catch (error: any) {
+    console.error('Error searching hospitals:', error);
+  } finally {
+    loading.value = false;
+  }
+};
+
 
     const searchNearbyHospitals = async () => {
       loading.value = true;
       try {
-        const location = await getCurrentLocation();
-        if (location) {
-          const latLng = {
-            latitude: location.lat(),
-            longitude: location.lng()
+        const loc = await getCurrentLocation();
+        if (loc) {
+          location.value = {
+            latitude: loc.lat(),
+            longitude: loc.lng(),
           };
-          const results = await searchHospitalsNearby(latLng.latitude, latLng.longitude);
+          const results = await searchHospitalsNearby(location.value.latitude, location.value.longitude);
           hospitals.value = results as Hospital[];
           currentPage.value = 1;
           updateMapMarkers();
@@ -161,21 +159,44 @@ export default defineComponent({
       }
     };
 
-    const generateShareableLinkHandler = async (hospital: Hospital) => {
+ const generateShareableLinkForFilteredHospitalsHandler = async () => {
+      loading.value = true;
       try {
-        loading.value = true;
+        // Prepare the data you need to send to the backend
+        const hospitalsData = filteredHospitals.value.map(hospital => ({
+          id: hospital.id,
+          name: hospital.name,
+          address: hospital.address,
+          phone: hospital.phone,
+          website: hospital.website,
+        }));
 
-        const dynamicLink = await createDynamicLink(hospital.id);
-        await navigator.clipboard.writeText(dynamicLink);
+        // Send a POST request to your backend to generate the shareable link
+        const response = await axios.post('https://us-central1-carefinder-70ff2.cloudfunctions.net/generateShareableLinkForFilteredHospitals', {
+          hospitals: hospitalsData,
+        });
+
+        // Assuming your backend returns the short URL
+        const shareableLink = response.data.shortUrl;
+
+        // Copy the link to the clipboard
+        await copyToClipboard(shareableLink);
         alert('Shareable link copied to clipboard!');
-      } catch (error: any) {
-        console.error('Error generating shareable link:', error);
+      } catch (error) {
+        console.error('Error generating shareable link for filtered hospitals:', error);
         alert('Failed to generate shareable link.');
       } finally {
         loading.value = false;
       }
     };
 
+    const copyToClipboard = async (text: string) => {
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        throw new Error('Clipboard API not supported');
+      }
+    };
     const updateMapMarkers = () => {
       if (!map.value) return;
       markers.forEach(marker => marker.setMap(null));
@@ -211,7 +232,7 @@ export default defineComponent({
       window.initMap = () => {
         map.value = new google.maps.Map(document.getElementById('map') as HTMLElement, {
           center: { lat: 9.082, lng: 8.6753 },
-          zoom: 5.5
+          zoom: 5.5,
         });
         updateMapMarkers();
       };
@@ -237,17 +258,15 @@ export default defineComponent({
       searchNearbyHospitals,
       exportHospitals: exportHospitalsHandler,
       shareViaEmail: shareViaEmailHandler,
-      generateShareableLink: generateShareableLinkHandler,
+      generateShareableLinkForFilteredHospitalsHandler,
       loading,
       prevPage,
       nextPage,
       selectHospital,
     };
-  }
+  },
 });
 </script>
-
-
 
 <style scoped>
 .container {
@@ -297,40 +316,32 @@ export default defineComponent({
 }
 
 .search-nearby-button {
-  padding: 10px 20px;
+  padding: 10px;
   background-color: #3498db;
-  color: #fff;
+  color: white;
   border: none;
   border-radius: 5px;
   cursor: pointer;
-}
-
-.search-nearby-button:hover {
-  background-color: #2980b9;
 }
 
 .action-buttons {
   display: flex;
   gap: 10px;
-  justify-content: flex-start;
 }
 
 .action-button {
-  padding: 10px 20px;
+  padding: 10px;
   background-color: #3498db;
-  color: #fff;
+  color: white;
   border: none;
   border-radius: 5px;
   cursor: pointer;
 }
 
-.action-button:hover {
-  background-color: #2980b9;
-}
-
 .hospital-list {
   list-style: none;
   padding: 0;
+  margin: 0;
 }
 
 .hospital-card {
@@ -338,53 +349,34 @@ export default defineComponent({
   border: 1px solid #ddd;
   border-radius: 5px;
   margin-bottom: 10px;
-  background-color: #fff;
   cursor: pointer;
-  transition: background-color 0.3s;
-}
-
-.hospital-card:hover {
-  background-color: #f5f5f5;
 }
 
 .hospital-card.selected {
-  background-color: #e0f7fa;
+  background-color: #eaf4ff;
 }
 
 .website-link {
   color: #3498db;
-}
-
-.website-link:hover {
-  text-decoration: underline;
+  text-decoration: none;
 }
 
 .pagination {
   display: flex;
-  justify-content: center;
-  gap: 10px;
+  justify-content: space-between;
 }
 
 .pagination-button {
-  padding: 10px 20px;
+  padding: 10px;
   background-color: #3498db;
-  color: #fff;
+  color: white;
   border: none;
   border-radius: 5px;
   cursor: pointer;
 }
 
-.pagination-button:disabled {
-  background-color: #bdc3c7;
-  cursor: not-allowed;
-}
-
 .map {
   height: 400px;
-  width: 100%;
-  margin-top: 20px;
-  border-radius: 5px;
   border: 1px solid #ddd;
 }
 </style>
-

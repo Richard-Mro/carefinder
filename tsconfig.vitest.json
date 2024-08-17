@@ -14,7 +14,7 @@
     "src/**/*.tsx",
     "src/**/*.vue",
     "test/**/*.ts",
-    "src/router/index.js",
+    "src/router/index.ts",
     "env.d.ts"
   ],
   "exclude": ["node_modules"]

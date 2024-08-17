@@ -1,34 +1,67 @@
-import { onRequest } from 'firebase-functions/v1/https'
 import * as functions from 'firebase-functions'
-import * as logger from 'firebase-functions/logger'
-import { Request, Response } from 'express'
 import * as admin from 'firebase-admin'
-import * as csv from 'csv-writer'
-import { stringify } from 'csv-stringify'
+import * as cors from 'cors'
 import * as nodemailer from 'nodemailer'
+import * as csv from 'csv-writer'
 import { v4 as uuidv4 } from 'uuid'
 import * as fs from 'fs'
 import * as path from 'path'
 import axios from 'axios'
-import * as cors from 'cors'
+import { google } from 'googleapis'
+import { Request, Response } from 'express'
 
 admin.initializeApp()
 const bucket = admin.storage().bucket()
 const firestore = admin.firestore()
-const corsHandler = cors({ origin: true }) // CORS handler
+const corsHandler = cors({ origin: true })
+
+// Initialize OAuth2 client
+const oAuth2Client = new google.auth.OAuth2(
+  functions.config().google.client_id,
+  functions.config().google.client_secret,
+  'https://developers.google.com/oauthplayground'
+)
+oAuth2Client.setCredentials({ refresh_token: functions.config().google.refresh_token })
+
+// Function to get access token for OAuth2
+async function getAccessToken() {
+  const accessTokenResponse = await oAuth2Client.getAccessToken()
+  return accessTokenResponse?.token ?? ''
+}
+
+// Create a transporter for sending emails
+async function createTransporter() {
+  const accessToken = await getAccessToken()
+
+  return nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
+    auth: {
+      type: 'OAuth2',
+      user: functions.config().email.user,
+      clientId: functions.config().google.client_id,
+      clientSecret: functions.config().google.client_secret,
+      refreshToken: functions.config().google.refresh_token,
+      accessToken: accessToken
+    }
+  })
+}
 
 // Get Firebase Config
-export const getFirebaseConfig = onRequest((request: Request, response: Response) => {
-  response.json({
-    apiKey: functions.config().custom.firebase.api_key,
-    authDomain: functions.config().custom.firebase.auth_domain,
-    projectId: functions.config().custom.firebase.project_id,
-    databaseURL: functions.config().custom.firebase.database_url,
-    storageBucket: functions.config().custom.firebase.storage_bucket,
-    messagingSenderId: functions.config().custom.firebase.messaging_sender_id,
-    appId: functions.config().custom.firebase.app_id,
-    measurementId: functions.config().custom.firebase.measurement_id,
-    googleMapsApiKey: functions.config().custom.google.maps_api_key
+export const getFirebaseConfig = functions.https.onRequest((req: Request, res: Response) => {
+  corsHandler(req, res, () => {
+    res.json({
+      apiKey: functions.config().custom.firebase.api_key,
+      authDomain: functions.config().custom.firebase.auth_domain,
+      projectId: functions.config().custom.firebase.project_id,
+      databaseURL: functions.config().custom.firebase.database_url,
+      storageBucket: functions.config().custom.firebase.storage_bucket,
+      messagingSenderId: functions.config().custom.firebase.messaging_sender_id,
+      appId: functions.config().custom.firebase.app_id,
+      measurementId: functions.config().custom.firebase.measurement_id,
+      googleMapsApiKey: functions.config().custom.google.maps_api_key
+    })
   })
 })
 
@@ -45,7 +78,7 @@ export const exportHospitalsToCSV = functions.https.onRequest(
 
         const hospitals = hospitalsSnapshot.docs.map((doc) => doc.data())
         const csvData = [['ID', 'Name', 'Address', 'Phone', 'Website']]
-        hospitals.forEach((hospital) => {
+        hospitals.forEach((hospital: any) => {
           csvData.push([
             hospital.id,
             hospital.name,
@@ -55,28 +88,31 @@ export const exportHospitalsToCSV = functions.https.onRequest(
           ])
         })
 
-        stringify(csvData, async (err, output) => {
-          if (err) {
-            res.status(500).send('Error generating CSV.')
-            return
-          }
-
-          const csvFileName = `hospitals_${uuidv4()}.csv`
-          const filePath = path.join('/tmp', csvFileName)
-          fs.writeFileSync(filePath, output)
-
-          try {
-            await bucket.upload(filePath, { destination: `exports/${csvFileName}`, public: true })
-            const fileUrl = `https://storage.googleapis.com/${bucket.name}/exports/${csvFileName}`
-            res.status(200).json({ url: fileUrl })
-          } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-            console.error('Error uploading CSV to bucket:', errorMessage)
-            res.status(500).send('Internal Server Error')
-          } finally {
-            fs.unlinkSync(filePath) // Clean up temporary file
-          }
+        const csvFileName = `hospitals_${uuidv4()}.csv`
+        const filePath = path.join('/tmp', csvFileName)
+        const csvStringifier = csv.createObjectCsvStringifier({
+          header: [
+            { id: 'id', title: 'ID' },
+            { id: 'name', title: 'Name' },
+            { id: 'address', title: 'Address' },
+            { id: 'phone', title: 'Phone' },
+            { id: 'website', title: 'Website' }
+          ]
         })
+        const output = csvStringifier.stringifyRecords(hospitals)
+        fs.writeFileSync(filePath, output)
+
+        try {
+          await bucket.upload(filePath, { destination: `exports/${csvFileName}`, public: true })
+          const fileUrl = `https://storage.googleapis.com/${bucket.name}/exports/${csvFileName}`
+          res.status(200).json({ url: fileUrl })
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+          console.error('Error uploading CSV to bucket:', errorMessage)
+          res.status(500).send('Internal Server Error')
+        } finally {
+          fs.unlinkSync(filePath) // Clean up temporary file
+        }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error'
         console.error('Error exporting hospitals to CSV:', errorMessage)
@@ -87,14 +123,21 @@ export const exportHospitalsToCSV = functions.https.onRequest(
 )
 
 // Share Hospitals via Email
-export const shareHospitalsViaEmail = onRequest(
-  async (request: Request, response: Response): Promise<void> => {
-    corsHandler(request, response, async () => {
+export const shareHospitalsViaEmail = functions
+  .region('us-central1')
+  .https.onRequest(async (req: Request, res: Response) => {
+    corsHandler(req, res, async () => {
+      if (req.method !== 'POST') {
+        res.set('Allow', 'POST')
+        res.status(405).send('Method Not Allowed')
+        return
+      }
+
       try {
-        const { email, message } = request.body
+        const { email, message } = req.body
 
         if (!email || !email.includes('@')) {
-          response.status(400).json({ success: false, message: 'Valid email is required.' })
+          res.status(400).json({ success: false, message: 'Valid email is required.' })
           return
         }
 
@@ -103,7 +146,6 @@ export const shareHospitalsViaEmail = onRequest(
 
         const csvFileName = `hospitals_${uuidv4()}.csv`
         const csvFilePath = path.join('/tmp', csvFileName)
-
         const csvWriter = csv.createObjectCsvWriter({
           path: csvFilePath,
           header: [
@@ -113,18 +155,10 @@ export const shareHospitalsViaEmail = onRequest(
             { id: 'website', title: 'Website' }
           ]
         })
-
         await csvWriter.writeRecords(hospitals)
 
-        const transporter = nodemailer.createTransport({
-          service: 'gmail',
-          auth: {
-            user: functions.config().email.user,
-            pass: functions.config().email.pass
-          }
-        })
-
-        await transporter.sendMail({
+        const transporter = await createTransporter()
+        const mailOptions = {
           from: functions.config().email.user,
           to: email,
           subject: 'List of Hospitals',
@@ -135,92 +169,82 @@ export const shareHospitalsViaEmail = onRequest(
               path: csvFilePath
             }
           ]
-        })
+        }
 
-        // Clean up temporary file
+        await transporter.sendMail(mailOptions)
+
         fs.unlinkSync(csvFilePath)
 
-        response.json({ success: true, message: 'Email sent successfully.' })
+        res.json({ success: true, message: 'Email sent successfully.' })
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-        logger.error('Error sharing hospitals via email:', errorMessage)
-        response.status(500).json({ success: false, message: 'Failed to share hospitals.' })
+        console.error('Error sharing hospitals via email:', errorMessage)
+        res.status(500).json({ success: false, message: 'Failed to share hospitals.' })
       }
     })
-  }
-)
+  })
 
-// Generate Shareable Link
-export const generateShareableLink = onRequest(
-  async (request: Request, response: Response): Promise<void> => {
-    corsHandler(request, response, async () => {
+const BITLY_ACCESS_TOKEN = functions.config().bitly.token
+
+if (!BITLY_ACCESS_TOKEN) {
+  throw new Error('Bitly Access Token not found. Please set it in the functions.config.')
+}
+
+// Generate Shareable Link for Filtered Hospitals
+export const generateShareableLinkForFilteredHospitals = functions.https.onRequest(
+  async (req: Request, res: Response) => {
+    corsHandler(req, res, async () => {
       try {
-        const { hospitalId } = request.body
+        // Receive filtered hospitals list from the request body
+        const filteredHospitalsList = req.body.hospitals
 
-        if (!hospitalId) {
-          response.status(400).json({ success: false, message: 'Hospital ID is required.' })
-          return
-        }
+        // Map the received data to include all required details
+        const hospitalsData = filteredHospitalsList.map((hospital: any) => ({
+          id: hospital.id,
+          name: hospital.name,
+          address: hospital.address,
+          phone: hospital.phone,
+          website: hospital.website
+        }))
 
-        const doc = await firestore.collection('hospitals').doc(hospitalId).get()
+        // Encode the hospitals data into a query parameter
+        const encodedHospitalsData = encodeURIComponent(JSON.stringify(hospitalsData))
+        const longUrl = `https://carefinder-70ff2.web.app/filtered-hospitals?data=${encodedHospitalsData}`
 
-        if (!doc.exists) {
-          response.status(404).json({ success: false, message: 'Hospital not found.' })
-          return
-        }
-
-        const data = doc.data()
-        const hospitalName = data?.name || 'Unknown Hospital'
-
-        // Construct the dynamic link using the correct domain
-        const dynamicLink = `https://carefinder-70ff2.page.link/?link=https://carefinder-70ff2.web.app/hospitals/${hospitalId}&apn=com.example.android&ibi=com.example.ios&st=${encodeURIComponent(hospitalName)}`
-
-        response.json({ success: true, link: dynamicLink })
+        // Shorten the long URL using Bitly
+        const shortUrl = await shortenUrl(longUrl)
+        res.json({ success: true, shortUrl })
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-        logger.error('Error generating shareable link:', errorMessage)
-        response.status(500).json({ success: false, message: 'Failed to generate shareable link.' })
+        console.error('Error generating shareable link:', error)
+        res.status(500).json({ success: false, message: 'Failed to generate shareable link.' })
       }
     })
   }
 )
 
-// Generate Dynamic Link using Firebase Dynamic Links API
-export const generateDynamicLink = functions.https.onCall(
-  async (data, context): Promise<{ shortLink: string }> => {
-    const { hospitalId } = data
-    if (!hospitalId) {
-      throw new functions.https.HttpsError('invalid-argument', 'Hospital ID is required.')
-    }
-
-    const dynamicLinkParams = {
-      dynamicLinkInfo: {
-        domainUriPrefix: 'https://carefinder-70ff2.page.link',
-        link: `https://carefinder-70ff2.web.app/hospitals/${hospitalId}`,
-        androidInfo: {
-          androidPackageName: 'com.example.android'
-        },
-        iosInfo: {
-          iosBundleId: 'com.example.ios'
+async function shortenUrl(longUrl: string): Promise<string> {
+  try {
+    const response = await axios.post(
+      'https://api-ssl.bitly.com/v4/shorten',
+      { long_url: longUrl },
+      {
+        headers: {
+          Authorization: `Bearer ${BITLY_ACCESS_TOKEN}`,
+          'Content-Type': 'application/json'
         }
-      },
-      suffix: {
-        option: 'SHORT'
       }
+    )
+    console.log('Bitly response:', response.data) // Log full response
+    return response.data.link
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      console.error('Axios error:', error.response?.data) // Log response data
+      console.error('Axios error message:', error.message) // Log error message
+    } else if (error instanceof Error) {
+      console.error('Error shortening URL:', error.message) // Log detailed error message
+    } else {
+      console.error('Unknown error occurred:', error) // Log unknown errors
     }
-
-    try {
-      const response = await axios.post(
-        `https://firebasedynamiclinks.googleapis.com/v1/shortLinks?key=${functions.config().firebase.api_key}`,
-        dynamicLinkParams
-      )
-
-      const shortLink = response.data.shortLink
-      return { shortLink }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      console.error('Error generating dynamic link:', errorMessage)
-      throw new functions.https.HttpsError('internal', 'Failed to generate dynamic link.')
-    }
+    throw new Error('Failed to shorten URL')
   }
-)
+}
