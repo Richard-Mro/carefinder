@@ -4,21 +4,41 @@
       <div class="spinner"></div>
     </div>
 
+    <!-- Reposition the Search Nearby Hospitals button above the search input -->
+    <button @click="searchNearbyHospitals" class="search-nearby-button">
+      Click to Search Hospitals Near You
+    </button>
+
     <div class="search-bar">
       <input
         type="text"
         v-model="searchKeyword"
         @input="performSearch"
-        placeholder="Input Location..."
+        placeholder="Input your preferred Location or State..."
         class="search-input"
       />
-      <button @click="searchNearbyHospitals" class="search-nearby-button">Search Nearby Hospitals</button>
     </div>
 
     <div class="action-buttons">
-      <button @click="exportHospitals" class="action-button">Export to CSV</button>
-      <button @click="shareViaEmail" class="action-button">Share via Email</button>
-      <button @click="generateShareableLinkForFilteredHospitalsHandler" class="action-button">
+      <button
+        @click="exportHospitals"
+        class="action-button"
+        :disabled="!isActionable"
+      >
+        Export to CSV
+      </button>
+      <button
+        @click="shareViaEmail"
+        class="action-button"
+        :disabled="!isActionable"
+      >
+        Share via Email
+      </button>
+      <button
+        @click="generateShareableLinkForFilteredHospitalsHandler"
+        class="action-button"
+        :disabled="!isActionable"
+      >
         Generate Shareable Link for Filtered Hospitals
       </button>
     </div>
@@ -40,6 +60,7 @@
 
     <div v-if="!loading" class="pagination">
       <button @click="prevPage" :disabled="currentPage === 1" class="pagination-button">Previous</button>
+      <span class="page-info">{{ currentPage }} / {{ totalPages }}</span>
       <button @click="nextPage" :disabled="currentPage === totalPages" class="pagination-button">Next</button>
     </div>
 
@@ -49,7 +70,6 @@
 
 <script lang="ts">
 import { defineComponent, ref, computed, onMounted } from 'vue';
-// Import other necessary services
 import { searchHospitals, searchHospitalsNearby } from '@/services/hospitalService';
 import { getCurrentLocation } from '@/services/geolocationHelper';
 import { Hospital } from '@/api/types';
@@ -69,6 +89,8 @@ export default defineComponent({
     const map = ref<google.maps.Map | null>(null);
     const markers: google.maps.Marker[] = [];
     const location = ref<{ latitude: number; longitude: number } | null>(null);
+
+    const isActionable = computed(() => searchKeyword.value.trim().length > 0);
 
     const filteredHospitals = computed(() => {
       const keyword = searchKeyword.value.toLowerCase();
@@ -93,19 +115,18 @@ export default defineComponent({
     };
 
     const performSearch = async () => {
-  loading.value = true;
-  try {
-    const results = await searchHospitals(searchKeyword.value.toLowerCase());
-    hospitals.value = results as Hospital[];
-    currentPage.value = 1;
-    updateMapMarkers();
-  } catch (error: any) {
-    console.error('Error searching hospitals:', error);
-  } finally {
-    loading.value = false;
-  }
-};
-
+      loading.value = true;
+      try {
+        const results = await searchHospitals(searchKeyword.value.toLowerCase());
+        hospitals.value = results as Hospital[];
+        currentPage.value = 1;
+        updateMapMarkers();
+      } catch (error: any) {
+        console.error('Error searching hospitals:', error);
+      } finally {
+        loading.value = false;
+      }
+    };
 
     const searchNearbyHospitals = async () => {
       loading.value = true;
@@ -159,36 +180,28 @@ export default defineComponent({
       }
     };
 
- const generateShareableLinkForFilteredHospitalsHandler = async () => {
-      loading.value = true;
-      try {
-        // Prepare the data you need to send to the backend
-        const hospitalsData = filteredHospitals.value.map(hospital => ({
-          id: hospital.id,
-          name: hospital.name,
-          address: hospital.address,
-          phone: hospital.phone,
-          website: hospital.website,
-        }));
+    async function generateShareableLinkForFilteredHospitalsHandler() {
+  loading.value = true;
+  try {
+    const response = await axios.post(
+      'https://us-central1-carefinder-70ff2.cloudfunctions.net/generateShareableLinkForFilteredHospitals',
+      { hospitals: filteredHospitals.value }
+    );
+    
+    if (response.data.success) {
+      const shareableLink = response.data.shareableLink;
+      alert(`Shareable link generated: ${shareableLink}`);
+    } else {
+      alert('Failed to generate shareable link.');
+    }
+  } catch (error) {
+    console.error('Error generating shareable link:', error);
+    alert('An error occurred while generating the shareable link.');
+  } finally {
+    loading.value = false;
+  }
+}
 
-        // Send a POST request to your backend to generate the shareable link
-        const response = await axios.post('https://us-central1-carefinder-70ff2.cloudfunctions.net/generateShareableLinkForFilteredHospitals', {
-          hospitals: hospitalsData,
-        });
-
-        // Assuming your backend returns the short URL
-        const shareableLink = response.data.shortUrl;
-
-        // Copy the link to the clipboard
-        await copyToClipboard(shareableLink);
-        alert('Shareable link copied to clipboard!');
-      } catch (error) {
-        console.error('Error generating shareable link for filtered hospitals:', error);
-        alert('Failed to generate shareable link.');
-      } finally {
-        loading.value = false;
-      }
-    };
 
     const copyToClipboard = async (text: string) => {
       if (navigator.clipboard) {
@@ -197,6 +210,7 @@ export default defineComponent({
         throw new Error('Clipboard API not supported');
       }
     };
+
     const updateMapMarkers = () => {
       if (!map.value) return;
       markers.forEach(marker => marker.setMap(null));
@@ -263,6 +277,7 @@ export default defineComponent({
       prevPage,
       nextPage,
       selectHospital,
+      isActionable,
     };
   },
 });
@@ -303,6 +318,18 @@ export default defineComponent({
   100% { transform: rotate(360deg); }
 }
 
+/* Make the Search Nearby Hospitals button stand out */
+.search-nearby-button {
+  padding: 10px;
+  background-color: #f39c12; /* Orange color */
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+  margin-bottom: 15px;
+}
+
 .search-bar {
   display: flex;
   gap: 10px;
@@ -313,15 +340,6 @@ export default defineComponent({
   padding: 10px;
   border-radius: 5px;
   border: 1px solid #ddd;
-}
-
-.search-nearby-button {
-  padding: 10px;
-  background-color: #3498db;
-  color: white;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
 }
 
 .action-buttons {
@@ -336,6 +354,12 @@ export default defineComponent({
   border: none;
   border-radius: 5px;
   cursor: pointer;
+}
+
+.action-button:disabled {
+  background-color: #ccc; /* Light gray */
+  color: #666; /* Dark gray */
+  cursor: not-allowed;
 }
 
 .hospital-list {
@@ -364,6 +388,12 @@ export default defineComponent({
 .pagination {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+}
+
+.page-info {
+  font-size: 14px;
+  font-weight: bold;
 }
 
 .pagination-button {
@@ -373,6 +403,12 @@ export default defineComponent({
   border: none;
   border-radius: 5px;
   cursor: pointer;
+}
+
+.pagination-button:disabled {
+  background-color: #ccc; /* Light gray */
+  color: #666; /* Dark gray */
+  cursor: not-allowed;
 }
 
 .map {

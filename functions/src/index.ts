@@ -184,12 +184,6 @@ export const shareHospitalsViaEmail = functions
     })
   })
 
-const BITLY_ACCESS_TOKEN = functions.config().bitly.token
-
-if (!BITLY_ACCESS_TOKEN) {
-  throw new Error('Bitly Access Token not found. Please set it in the functions.config.')
-}
-
 // Generate Shareable Link for Filtered Hospitals
 export const generateShareableLinkForFilteredHospitals = functions.https.onRequest(
   async (req: Request, res: Response) => {
@@ -211,7 +205,7 @@ export const generateShareableLinkForFilteredHospitals = functions.https.onReque
         const encodedHospitalsData = encodeURIComponent(JSON.stringify(hospitalsData))
         const longUrl = `https://carefinder-70ff2.web.app/filtered-hospitals?data=${encodedHospitalsData}`
 
-        // Shorten the long URL using Bitly
+        // Shorten the long URL using TinyURL
         const shortUrl = await shortenUrl(longUrl)
         res.json({ success: true, shortUrl })
       } catch (error) {
@@ -222,28 +216,21 @@ export const generateShareableLinkForFilteredHospitals = functions.https.onReque
   }
 )
 
+// Function to shorten a URL using TinyURL
 async function shortenUrl(longUrl: string): Promise<string> {
   try {
-    const response = await axios.post(
-      'https://api-ssl.bitly.com/v4/shorten',
-      { long_url: longUrl },
-      {
-        headers: {
-          Authorization: `Bearer ${BITLY_ACCESS_TOKEN}`,
-          'Content-Type': 'application/json'
-        }
-      }
+    const response = await axios.get(
+      `https://tinyurl.com/api-create.php?url=${encodeURIComponent(longUrl)}`
     )
-    console.log('Bitly response:', response.data) // Log full response
-    return response.data.link
+    return response.data
   } catch (error) {
     if (axios.isAxiosError(error)) {
-      console.error('Axios error:', error.response?.data) // Log response data
-      console.error('Axios error message:', error.message) // Log error message
+      console.error('Axios error:', error.response?.data)
+      console.error('Axios error message:', error.message)
     } else if (error instanceof Error) {
-      console.error('Error shortening URL:', error.message) // Log detailed error message
+      console.error('Error shortening URL:', error.message)
     } else {
-      console.error('Unknown error occurred:', error) // Log unknown errors
+      console.error('Unknown error occurred:', error)
     }
     throw new Error('Failed to shorten URL')
   }
