@@ -180,28 +180,36 @@ export default defineComponent({
       }
     };
 
-    async function generateShareableLinkForFilteredHospitalsHandler() {
-  loading.value = true;
-  try {
-    const response = await axios.post(
-      'https://us-central1-carefinder-70ff2.cloudfunctions.net/generateShareableLinkForFilteredHospitals',
-      { hospitals: filteredHospitals.value }
-    );
-    
-    if (response.data.success) {
-      const shareableLink = response.data.shareableLink;
-      alert(`Shareable link generated: ${shareableLink}`);
-    } else {
-      alert('Failed to generate shareable link.');
-    }
-  } catch (error) {
-    console.error('Error generating shareable link:', error);
-    alert('An error occurred while generating the shareable link.');
-  } finally {
-    loading.value = false;
-  }
-}
+    const generateShareableLinkForFilteredHospitalsHandler = async () => {
+      loading.value = true;
+      try {
+        // Prepare the data you need to send to the backend
+        const hospitalsData = filteredHospitals.value.map(hospital => ({
+          id: hospital.id,
+          name: hospital.name,
+          address: hospital.address,
+          phone: hospital.phone,
+          website: hospital.website,
+        }));
 
+        // Send a POST request to your backend to generate the shareable link
+        const response = await axios.post('https://us-central1-carefinder-70ff2.cloudfunctions.net/generateShareableLinkForFilteredHospitals', {
+          hospitals: hospitalsData,
+        });
+
+        // Assuming your backend returns the short URL
+        const shareableLink = response.data.shortUrl;
+
+        // Copy the link to the clipboard
+        await copyToClipboard(shareableLink);
+        alert('Shareable link copied to clipboard!');
+      } catch (error) {
+        console.error('Error generating shareable link for filtered hospitals:', error);
+        alert('Failed to generate shareable link.');
+      } finally {
+        loading.value = false;
+      }
+    };
 
     const copyToClipboard = async (text: string) => {
       if (navigator.clipboard) {
@@ -210,7 +218,6 @@ export default defineComponent({
         throw new Error('Clipboard API not supported');
       }
     };
-
     const updateMapMarkers = () => {
       if (!map.value) return;
       markers.forEach(marker => marker.setMap(null));
