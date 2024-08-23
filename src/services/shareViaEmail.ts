@@ -1,12 +1,15 @@
 import axios from 'axios'
 
-export const shareViaEmail = async (email: string, hospitalList: string[]) => {
+export const shareViaEmail = async (
+  email: string,
+  hospitalList: { id: string; name: string; address: string; phone: string; website: string }[]
+) => {
   try {
     const response = await axios.post(
       'https://us-central1-carefinder-70ff2.cloudfunctions.net/shareHospitalsViaEmail',
       {
-        email, // Directly use the variable name if it matches
-        message: `Here is the list of hospitals: ${hospitalList.join(', ')}`
+        email,
+        hospitals: hospitalList // Send the list of filtered hospitals to the backend
       },
       {
         headers: {
@@ -18,7 +21,6 @@ export const shareViaEmail = async (email: string, hospitalList: string[]) => {
     console.log('Response from server:', response.data)
     return 'Email sent successfully.'
   } catch (error) {
-    // Use `axios` error response if available
     if (axios.isAxiosError(error)) {
       console.error('Error sharing hospitals via email:', error.response?.data || error.message)
     } else {

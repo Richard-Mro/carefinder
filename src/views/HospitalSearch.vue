@@ -152,33 +152,77 @@ export default defineComponent({
       }
     };
 
-    const exportHospitalsHandler = async () => {
+     const exportFilteredHospitalsHandler = async () => {
       try {
         loading.value = true;
-        await exportHospitals();
+        const hospitalsData = filteredHospitals.value.map(hospital => ({
+          id: hospital.id,
+          name: hospital.name,
+          address: hospital.address,
+          phone: hospital.phone,
+          website: hospital.website,
+        }));
+
+        console.log('Filtered hospitals data to be exported:', hospitalsData); // Debug log
+
+        const response = await axios.post(
+          'https://us-central1-carefinder-70ff2.cloudfunctions.net/exportHospitalsToCSV',
+          { hospitals: hospitalsData }, // Pass filtered hospitals data here
+          {
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        if (response.data.url) {
+          window.open(response.data.url, '_blank');
+        } else {
+          console.error('Error: No URL returned from the server.');
+        }
       } catch (error) {
+        console.error('Error exporting hospitals:', error);
         alert('Failed to export hospitals.');
       } finally {
         loading.value = false;
       }
     };
 
-    const shareViaEmailHandler = async () => {
+    const shareFilteredHospitalsViaEmailHandler = async () => {
       const email = prompt('Enter email address:');
       if (!email) return;
 
-      const hospitalList = hospitals.value.map(hospital => hospital.name);
-
       try {
         loading.value = true;
-        const message = await shareViaEmail(email, hospitalList);
-        alert(message);
-      } catch (error: any) {
-        alert(error.message);
+        const hospitalsData = filteredHospitals.value.map(hospital => ({
+          id: hospital.id,
+          name: hospital.name,
+          address: hospital.address,
+          phone: hospital.phone,
+          website: hospital.website,
+        }));
+
+        console.log('Filtered hospitals data to be shared via email:', hospitalsData); // Debug log
+
+        const response = await axios.post(
+          'https://us-central1-carefinder-70ff2.cloudfunctions.net/shareHospitalsViaEmail',
+          { email, hospitals: hospitalsData }, // Pass filtered hospitals data here
+          {
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        alert(response.data.message || 'Email sent successfully.');
+      } catch (error) {
+        console.error('Error sharing hospitals via email:', error);
+        alert('Failed to send email.');
       } finally {
         loading.value = false;
       }
     };
+
 
     const generateShareableLinkForFilteredHospitalsHandler = async () => {
       loading.value = true;
@@ -277,8 +321,8 @@ export default defineComponent({
       totalPages,
       performSearch,
       searchNearbyHospitals,
-      exportHospitals: exportHospitalsHandler,
-      shareViaEmail: shareViaEmailHandler,
+      exportHospitals: exportFilteredHospitalsHandler,
+      shareViaEmail: shareFilteredHospitalsViaEmailHandler,
       generateShareableLinkForFilteredHospitalsHandler,
       loading,
       prevPage,
@@ -328,7 +372,7 @@ export default defineComponent({
 /* Make the Search Nearby Hospitals button stand out */
 .search-nearby-button {
   padding: 10px;
-  background-color: #f39c12; /* Orange color */
+  background-color: #15ce0b; /* Orange color */
   color: white;
   border: none;
   border-radius: 5px;

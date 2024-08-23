@@ -26,7 +26,7 @@ const routes: Array<RouteRecordRaw> = [
   {
     path: '/filtered-hospitals',
     name: 'FilteredHospitals',
-    component: () => import('../views/FilteredHospitals.vue'),
+    component: FilteredHospitals,
     props: (route) => ({
       data: route.query.data ? JSON.parse(decodeURIComponent(route.query.data as string)) : []
     })
