@@ -90,7 +90,9 @@ export default defineComponent({
     const markers: google.maps.Marker[] = [];
     const location = ref<{ latitude: number; longitude: number } | null>(null);
 
-    const isActionable = computed(() => searchKeyword.value.trim().length > 0);
+    const nearbySearchPerformed = ref(false);
+
+    const isActionable = computed(() => searchKeyword.value.trim().length > 0 || nearbySearchPerformed.value);
 
     const filteredHospitals = computed(() => {
       const keyword = searchKeyword.value.toLowerCase();
@@ -141,6 +143,7 @@ export default defineComponent({
           hospitals.value = results as Hospital[];
           currentPage.value = 1;
           updateMapMarkers();
+          nearbySearchPerformed.value = true; // Set to true when nearby search is performed
         } else {
           throw new Error('Could not get current location.');
         }
@@ -152,7 +155,7 @@ export default defineComponent({
       }
     };
 
-     const exportFilteredHospitalsHandler = async () => {
+    const exportFilteredHospitalsHandler = async () => {
       try {
         loading.value = true;
         const hospitalsData = filteredHospitals.value.map(hospital => ({
@@ -262,6 +265,7 @@ export default defineComponent({
         throw new Error('Clipboard API not supported');
       }
     };
+
     const updateMapMarkers = () => {
       if (!map.value) return;
       markers.forEach(marker => marker.setMap(null));
@@ -334,9 +338,45 @@ export default defineComponent({
 });
 </script>
 
+
 <style scoped>
+:root {
+  /* Light mode colors */
+  --color-primary: #3498db;
+  --color-secondary: #2c3e50;
+  --color-accent: #15ce0b;
+  --color:white;
+  --color-background-light: #f5f5f5;
+  --color-background-card-light: #ffffff;
+  --color-text-light: #333;
+  --color-text-muted-light: #555;
+  --color-border-light: #ddd;
+  --color-shadow-light: rgba(0, 0, 0, 0.1);
+
+  /* Dark mode colors */
+  --color-background-dark: #2c2c2c;
+  --color-dark: black;
+  --color-background-card-dark: #3c3c3c;
+  --color-text-dark: #ddd;
+  --color-text-muted-dark: #aaa;
+  --color-border-dark: #444;
+  --color-shadow-dark: rgba(0, 0, 0, 0.5);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color:var(--color);
+    --color-background-light: var(--color-background-dark);
+    --color-background-card-light: var(--color-background-card-dark);
+    --color-text-light: var(--color-text-dark);
+    --color-text-muted-light: var(--color-text-muted-dark);
+    --color-border-light: var(--color-border-dark);
+    --color-shadow-light: var(--color-shadow-dark);
+  }
+}
+
 .container {
-  padding: 20px;
+  padding: 25px;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -358,7 +398,7 @@ export default defineComponent({
 .spinner {
   border: 5px solid #f3f3f3;
   border-radius: 50%;
-  border-top: 5px solid #3498db;
+  border-top: 5px solid var(--color-primary);
   width: 40px;
   height: 40px;
   animation: spin 1s linear infinite;
@@ -369,16 +409,20 @@ export default defineComponent({
   100% { transform: rotate(360deg); }
 }
 
-/* Make the Search Nearby Hospitals button stand out */
+/* Button styling */
 .search-nearby-button {
   padding: 10px;
-  background-color: #15ce0b; /* Orange color */
-  color: white;
-  border: none;
+  background-color: var(--color-accent);
+  color: var(--color);
   border-radius: 5px;
   cursor: pointer;
   font-weight: bold;
   margin-bottom: 15px;
+  transition: background-color 0.3s ease;
+}
+
+.search-nearby-button:hover {
+  background-color: darken(var(--color-accent), 10%);
 }
 
 .search-bar {
@@ -390,7 +434,10 @@ export default defineComponent({
   flex: 1;
   padding: 10px;
   border-radius: 5px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--color-border-light);
+  background-color: var(--color-background-card-light);
+  color: var(--color-text-light);
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
 
 .action-buttons {
@@ -400,19 +447,25 @@ export default defineComponent({
 
 .action-button {
   padding: 10px;
-  background-color: #3498db;
+  background-color: var(--color-primary);
   color: white;
   border: none;
   border-radius: 5px;
   cursor: pointer;
+  transition: background-color 0.3s ease;
 }
 
 .action-button:disabled {
-  background-color: #ccc; /* Light gray */
-  color: #666; /* Dark gray */
+  background-color: #ccc;
+  color: #666;
   cursor: not-allowed;
 }
 
+.action-button:hover:not(:disabled) {
+  background-color: darken(var(--color-primary), 10%);
+}
+
+/* Hospital list and cards */
 .hospital-list {
   list-style: none;
   padding: 0;
@@ -421,19 +474,58 @@ export default defineComponent({
 
 .hospital-card {
   padding: 15px;
-  border: 1px solid #ddd;
-  border-radius: 5px;
+  border: 1px solid var(--color-border-light);
+  border-radius: 8px;
   margin-bottom: 10px;
-  cursor: pointer;
+  background-color: var(--color-background-card-light);
+  color: var(--color-text-light);
+  box-shadow: 0 2px 8px var(--color-shadow-light);
+  transition: background-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
+  overflow: hidden;
+  word-wrap: break-word;
+}
+
+.hospital-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 12px var(--color-shadow-light);
 }
 
 .hospital-card.selected {
-  background-color: #eaf4ff;
+  background-color: lighten(var(--color-primary), 40%);
+}
+
+.hospital-card h3 {
+  font-size: 1.25em;
+  margin-bottom: 10px;
+}
+
+.hospital-card p {
+  margin: 5px 0;
+  line-height: 1.4;
+  color: var(--color-text-muted-light);
+}
+
+.hospital-card p span {
+  font-weight: bold;
+  color: var(--color-primary);
+}
+
+.hospital-card p.address {
+  color: var(--color-secondary);
+}
+
+.hospital-card p.phone {
+  color: var(--color-accent);
+}
+
+.hospital-card p.website {
+  color: var(--color-primary);
 }
 
 .website-link {
-  color: #3498db;
-  text-decoration: none;
+  color: inherit;
+  text-decoration: underline;
+  word-break: break-word;
 }
 
 .pagination {
@@ -449,21 +541,26 @@ export default defineComponent({
 
 .pagination-button {
   padding: 10px;
-  background-color: #3498db;
+  background-color: var(--color-primary);
   color: white;
   border: none;
   border-radius: 5px;
   cursor: pointer;
+  transition: background-color 0.3s ease;
 }
 
 .pagination-button:disabled {
-  background-color: #ccc; /* Light gray */
-  color: #666; /* Dark gray */
+  background-color: #ccc;
+  color: #666;
   cursor: not-allowed;
+}
+
+.pagination-button:hover:not(:disabled) {
+  background-color: darken(var(--color-primary), 10%);
 }
 
 .map {
   height: 400px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--color-border-light);
 }
 </style>
