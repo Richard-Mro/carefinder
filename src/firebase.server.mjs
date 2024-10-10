@@ -11,7 +11,7 @@ const firebaseConfig = {
   databaseURL: process.env.VITE_APP_FIREBASE_DATABASE_URL,
   storageBucket: process.env.VITE_APP_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.VITE_FIREBASE_APP_ID,
+  appId: process.env.VITE_FIREBASE_APP_ID,
   measurementId: process.env.VITE_FIREBASE_MEASUREMENT_ID,
   googleMapsApiKey: process.env.VITE_APP_GOOGLE_MAPS_API_KEY
 }
