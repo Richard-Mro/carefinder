@@ -114,6 +114,7 @@ export default defineComponent({
 
 .header {
   margin-bottom: 40px;
+  padding: 20px;
 }
 
 .header h1 {
