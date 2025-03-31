@@ -1,4 +1,4 @@
-import express from 'express'
+/* import express from 'express'
 import cors from 'cors'
 import { config } from 'dotenv'
 import { fetchAndUploadHospitals } from './src/api/uploadToFirestore.mjs'
@@ -53,3 +53,4 @@ app.listen(port, () => {
 })
 
 export default app
+ */
