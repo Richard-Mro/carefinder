@@ -21,14 +21,14 @@
 
     <div class="action-buttons">
       <button
-        @click="exportHospitals"
+        @click="exportFilteredHospitalsHandler"
         class="action-button"
         :disabled="!isActionable"
       >
         Export to CSV
       </button>
       <button
-        @click="shareViaEmail"
+        @click="generateShareableLinkForFilteredHospitalsHandler"
         class="action-button"
         :disabled="!isActionable"
       >
@@ -73,8 +73,8 @@ import { defineComponent, ref, computed, onMounted } from 'vue';
 import { searchHospitals, searchHospitalsNearby } from '@/services/hospitalService';
 import { getCurrentLocation } from '@/services/geolocationHelper';
 import { Hospital } from '@/api/types';
-import { exportHospitals } from '@/services/exportHospitals';
-import { shareViaEmail } from '@/services/shareViaEmail';
+import { exportHospitals } from '@/services/exportHospitals';  // Ensure you have a correct exportHospitals service.
+import { shareViaEmail } from '@/services/shareViaEmail';  // Ensure you have a correct shareViaEmail service.
 import axios from 'axios';
 
 export default defineComponent({
@@ -116,11 +116,69 @@ export default defineComponent({
       selectedHospital.value = hospital;
     };
 
+    // Function to check if the app is online or offline
+    const isOnline = computed(() => navigator.onLine);
+
+    // Function to save hospitals to IndexedDB
+    const saveHospitalsToIndexedDB = (data: Hospital[]) => {
+      const request = indexedDB.open('carefinder', 1);
+      
+      request.onupgradeneeded = (event) => {
+        const db = (event.target as IDBRequest).result;
+        if (!db.objectStoreNames.contains('hospitals')) {
+          db.createObjectStore('hospitals', { keyPath: 'id' });
+        }
+      };
+
+      request.onsuccess = () => {
+        const db = request.result;
+        const transaction = db.transaction('hospitals', 'readwrite');
+        const store = transaction.objectStore('hospitals');
+        
+        data.forEach(hospital => {
+          store.put(hospital);
+        });
+      };
+    };
+
+    // Function to get hospitals from IndexedDB
+    const getHospitalsFromIndexedDB = () => {
+      return new Promise<Hospital[]>((resolve, reject) => {
+        const request = indexedDB.open('carefinder', 1);
+
+        request.onsuccess = (event) => {
+          const db = (event.target as IDBRequest).result;
+          const transaction = db.transaction('hospitals', 'readonly');
+          const store = transaction.objectStore('hospitals');
+          const getAllRequest = store.getAll();
+
+          getAllRequest.onsuccess = () => {
+            resolve(getAllRequest.result);
+          };
+
+          getAllRequest.onerror = () => {
+            reject('Failed to fetch data from IndexedDB');
+          };
+        };
+
+        request.onerror = () => {
+          reject('Failed to open IndexedDB');
+        };
+      });
+    };
+
     const performSearch = async () => {
       loading.value = true;
       try {
-        const results = await searchHospitals(searchKeyword.value.toLowerCase());
-        hospitals.value = results as Hospital[];
+        if (isOnline.value) {
+          const results = await searchHospitals(searchKeyword.value.toLowerCase());
+          hospitals.value = results as Hospital[];
+          saveHospitalsToIndexedDB(hospitals.value); // Save data to IndexedDB when online
+        } else {
+          const offlineData = await getHospitalsFromIndexedDB();
+          hospitals.value = offlineData;
+          alert('You are offline. Showing cached hospitals.');
+        }
         currentPage.value = 1;
         updateMapMarkers();
       } catch (error: any) {
@@ -141,9 +199,10 @@ export default defineComponent({
           };
           const results = await searchHospitalsNearby(location.value.latitude, location.value.longitude);
           hospitals.value = results as Hospital[];
+          saveHospitalsToIndexedDB(hospitals.value); // Save data to IndexedDB when online
           currentPage.value = 1;
           updateMapMarkers();
-          nearbySearchPerformed.value = true; // Set to true when nearby search is performed
+          nearbySearchPerformed.value = true;
         } else {
           throw new Error('Could not get current location.');
         }
@@ -166,11 +225,9 @@ export default defineComponent({
           website: hospital.website,
         }));
 
-        console.log('Filtered hospitals data to be exported:', hospitalsData); // Debug log
-
         const response = await axios.post(
           'https://us-central1-carefinder-70ff2.cloudfunctions.net/exportHospitalsToCSV',
-          { hospitals: hospitalsData }, // Pass filtered hospitals data here
+          { hospitals: hospitalsData },
           {
             headers: {
               'Content-Type': 'application/json'
@@ -191,46 +248,9 @@ export default defineComponent({
       }
     };
 
-    const shareFilteredHospitalsViaEmailHandler = async () => {
-      const email = prompt('Enter email address:');
-      if (!email) return;
-
-      try {
-        loading.value = true;
-        const hospitalsData = filteredHospitals.value.map(hospital => ({
-          id: hospital.id,
-          name: hospital.name,
-          address: hospital.address,
-          phone: hospital.phone,
-          website: hospital.website,
-        }));
-
-        console.log('Filtered hospitals data to be shared via email:', hospitalsData); // Debug log
-
-        const response = await axios.post(
-          'https://us-central1-carefinder-70ff2.cloudfunctions.net/shareHospitalsViaEmail',
-          { email, hospitals: hospitalsData }, // Pass filtered hospitals data here
-          {
-            headers: {
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-
-        alert(response.data.message || 'Email sent successfully.');
-      } catch (error) {
-        console.error('Error sharing hospitals via email:', error);
-        alert('Failed to send email.');
-      } finally {
-        loading.value = false;
-      }
-    };
-
-
     const generateShareableLinkForFilteredHospitalsHandler = async () => {
       loading.value = true;
       try {
-        // Prepare the data you need to send to the backend
         const hospitalsData = filteredHospitals.value.map(hospital => ({
           id: hospital.id,
           name: hospital.name,
@@ -239,15 +259,12 @@ export default defineComponent({
           website: hospital.website,
         }));
 
-        // Send a POST request to your backend to generate the shareable link
         const response = await axios.post('https://us-central1-carefinder-70ff2.cloudfunctions.net/generateShareableLinkForFilteredHospitals', {
           hospitals: hospitalsData,
         });
 
-        // Assuming your backend returns the short URL
         const shareableLink = response.data.shortUrl;
 
-        // Copy the link to the clipboard
         await copyToClipboard(shareableLink);
         alert('Shareable link copied to clipboard!');
       } catch (error) {
@@ -291,8 +308,15 @@ export default defineComponent({
 
     onMounted(async () => {
       try {
-        const results = await searchHospitals('');
-        hospitals.value = results as Hospital[];
+        if (isOnline.value) {
+          const results = await searchHospitals('');
+          hospitals.value = results as Hospital[];
+          saveHospitalsToIndexedDB(hospitals.value); // Save data when online
+        } else {
+          const offlineData = await getHospitalsFromIndexedDB();
+          hospitals.value = offlineData;
+          alert('You are offline. Showing cached hospitals.');
+        }
         updateMapMarkers();
       } catch (error) {
         console.error('Error fetching hospitals:', error);
@@ -320,23 +344,23 @@ export default defineComponent({
     return {
       searchKeyword,
       paginatedHospitals,
-      selectedHospital,
+      selectHospital,
+      loading,
       currentPage,
       totalPages,
-      performSearch,
-      searchNearbyHospitals,
-      exportHospitals: exportFilteredHospitalsHandler,
-      shareViaEmail: shareFilteredHospitalsViaEmailHandler,
-      generateShareableLinkForFilteredHospitalsHandler,
-      loading,
       prevPage,
       nextPage,
-      selectHospital,
+      exportFilteredHospitalsHandler, // Correct method name
+      generateShareableLinkForFilteredHospitalsHandler, // Correct method name
+      performSearch,
+      searchNearbyHospitals,
       isActionable,
+      selectedHospital,
     };
-  },
+  }
 });
 </script>
+
 
 
 <style scoped>
