@@ -1,9 +1,15 @@
 import { collection, getDocs } from 'firebase/firestore'
 import { db } from '../firebase'
 import { Hospital } from './types'
+import { saveHospitals, getCachedHospitals } from '../utils/indexedDB'
 
 export const fetchHospitals = async (): Promise<Hospital[]> => {
   try {
+    if (!navigator.onLine) {
+      console.log('Offline: Fetching hospitals from IndexedDB')
+      return await getCachedHospitals()
+    }
+
     if (!db) {
       throw new Error('Firestore database is not initialized')
     }
@@ -11,39 +17,34 @@ export const fetchHospitals = async (): Promise<Hospital[]> => {
     const hospitalsCollection = collection(db, 'hospitals')
     const snapshot = await getDocs(hospitalsCollection)
 
-    const hospitalsList: Hospital[] = snapshot.docs
-      .map((doc) => {
-        const data = doc.data()
+    const hospitalsList: Hospital[] = snapshot.docs.map((doc) => {
+      const data = doc.data()
 
-        // Normalize data structure
-        const hospitalData: Partial<Hospital> = {
-          name: data.name || 'Unknown',
-          address: data.address || 'Unknown',
-          phone: data.phone || 'Not Provided',
-          website: data.website || 'Not Available', 
-          markdown: data.markdown || 'N/A',
-          location: {
-            latitude: data.location?.latitude ?? 0,
-            longitude: data.location?.longitude ?? 0
-          }
+      // Ensure all required properties exist
+      const hospitalData: Hospital = {
+        id: doc.id,
+        name: data.name || 'Unknown',
+        address: data.address || 'Unknown',
+        phone: data.phone || 'Not Provided',
+        website: data.website || 'Not Available',
+        markdown: data.markdown || 'N/A',
+        location: {
+          latitude: data.location?.latitude ?? 0,
+          longitude: data.location?.longitude ?? 0
         }
+      }
 
-        // Validate the required fields
-        if (!hospitalData.name || !hospitalData.address || !hospitalData.location) {
-          console.error('Invalid hospital data:', data)
-          return null
-        }
+      return hospitalData
+    })
 
-        return {
-          id: doc.id,
-          ...hospitalData
-        } as Hospital
-      })
-      .filter((hospital): hospital is Hospital => hospital !== null)
+    // Save to IndexedDB for offline access
+    await saveHospitals(hospitalsList)
 
     return hospitalsList
   } catch (error: any) {
     console.error('Error fetching hospitals:', error)
-    throw new Error(error.toString())
+
+    // Return cached data if an error occurs
+    return await getCachedHospitals()
   }
 }
