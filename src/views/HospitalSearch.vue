@@ -171,16 +171,36 @@ export default defineComponent({
 
     // Export hospitals
     const exportFilteredHospitalsHandler = async () => {
-      loading.value = true;
-      try {
-        await exportHospitals(filteredHospitals.value);
-      } catch (error) {
-        console.error('Error exporting hospitals:', error);
-        alert('Failed to export hospitals.');
-      } finally {
+  loading.value = true;
+
+  const keyword = searchKeyword.value.trim();
+  const exportCount = filteredHospitals.value.length;
+
+  try {
+    if (!keyword) {
+      const confirmAll = confirm(`No search keyword entered.\nExport all ${exportCount} hospitals?`);
+      if (!confirmAll) {
         loading.value = false;
+        return;
       }
-    };
+    } else {
+      const confirmFiltered = confirm(`Export ${exportCount} hospitals matching "${keyword}"?`);
+      if (!confirmFiltered) {
+        loading.value = false;
+        return;
+      }
+    }
+
+    await exportHospitals(filteredHospitals.value, searchKeyword);
+  } catch (error) {
+    console.error('Error exporting hospitals:', error);
+    alert('Failed to export hospitals.');
+  } finally {
+    loading.value = false;
+  }
+};
+
+
 
     // Generate shareable link
     const generateShareableLinkForFilteredHospitalsHandler = async () => {

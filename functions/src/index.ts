@@ -64,55 +64,80 @@ export const getFirebaseConfig = functions.https.onRequest((req: Request, res: R
   })
 })
 
+
 // Export Hospitals to CSV with filtered data
-// Export Hospitals to CSV with filtered data
-export const exportHospitalsToCSV = functions.https.onRequest(async (req: Request, res: Response) => {
-  corsHandler(req, res, async () => {
-    try {
-      const hospitals = req.body.hospitals; // Hospitals data sent from frontend
-
-      // Log received hospitals data for debugging
-      console.log('Received hospitals data for CSV export:', JSON.stringify(hospitals, null, 2)); 
-
-      if (!hospitals || hospitals.length === 0) {
-        res.status(400).send('No hospitals data provided.');
-        return;
-      }
-
-      // Continue with CSV creation
-      const csvData = [['ID', 'Name', 'Address', 'Phone', 'Website']];
-      hospitals.forEach((hospital: any) => {
-        csvData.push([
-          hospital.id,
-          hospital.name,
-          hospital.address,
-          hospital.phone,
-          hospital.website
-        ]);
-      });
-
-      console.log('CSV Data to be written:', JSON.stringify(csvData, null, 2)); // Log the CSV data
-
-      const csvFileName = `hospitals_${uuidv4()}.csv`;
-      const filePath = path.join('/tmp', csvFileName);
-      fs.writeFileSync(filePath, csvData.join('\n'));
-
+export const exportHospitalsToCSV = functions.https.onRequest(
+  async (req: Request, res: Response) => {
+    corsHandler(req, res, async () => {
       try {
-        await bucket.upload(filePath, { destination: `exports/${csvFileName}`, public: true });
-        const fileUrl = `https://storage.googleapis.com/${bucket.name}/exports/${csvFileName}`;
-        res.status(200).json({ url: fileUrl });
+        if (req.method !== 'POST') {
+          res.status(405).send('Method Not Allowed. Use POST.')
+          return
+        }
+
+        const hospitals = req.body.hospitals
+        const keyword = (req.body.keyword || 'all').replace(/\s+/g, '_').toLowerCase()
+
+
+        // Validate hospitals payload
+        if (!Array.isArray(hospitals) || hospitals.length === 0) {
+          console.error('Invalid or empty hospitals data received:', hospitals)
+          res.status(400).send('No hospitals data provided or invalid format.')
+          return
+        }
+
+        console.log('Received hospitals data for CSV export:', JSON.stringify(hospitals, null, 2))
+
+        // Prepare CSV data
+        const csvData = [['ID', 'Name', 'Address', 'Phone', 'Website']]
+        hospitals.forEach((hospital: any) => {
+          csvData.push([
+            hospital.id ?? '',
+            hospital.name ?? '',
+            hospital.address ?? '',
+            hospital.phone ?? '',
+            hospital.website ?? ''
+          ])
+        })
+
+        const csvContent = csvData
+          .map((row) => row.map((field) => `"${field}"`).join(','))
+          .join('\n')
+
+        console.log('CSV content ready for writing:', csvContent)
+
+        // Write to temp file
+        const csvFileName = `hospitals_${keyword}_${uuidv4()}.csv`
+        const filePath = path.join('/tmp', csvFileName)
+        fs.writeFileSync(filePath, csvContent)
+
+        try {
+          await bucket.upload(filePath, {
+            destination: `exports/${csvFileName}`,
+            public: true,
+            metadata: {
+              contentType: 'text/csv'
+            }
+          })
+
+          const fileUrl = `https://storage.googleapis.com/${bucket.name}/exports/${csvFileName}`
+          res.status(200).json({ url: fileUrl })
+        } catch (uploadError) {
+          console.error('Error uploading CSV to bucket:', uploadError)
+          res.status(500).send('Error uploading CSV.')
+        } finally {
+          // Cleanup temp file
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath)
+          }
+        }
       } catch (error) {
-        console.error('Error uploading CSV to bucket:', error);
-        res.status(500).send('Internal Server Error');
-      } finally {
-        fs.unlinkSync(filePath); // Clean up temporary file
+        console.error('Unexpected error during CSV export:', error)
+        res.status(500).send('Internal Server Error')
       }
-    } catch (error) {
-      console.error('Error exporting hospitals to CSV:', error);
-      res.status(500).send('Internal Server Error');
-    }
-  });
-});
+    })
+  }
+)
 
 
 // Share Hospitals via Email with filtered data

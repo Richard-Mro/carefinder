@@ -1,26 +1,37 @@
-import axios from 'axios'
 
 export const exportHospitals = async (
-  hospitalList: { id: string; name: string; address: string; phone: string; website: string }[]
+  hospitalList: { id: string; name: string; address: string; phone: string; website: string }[],
+  searchKeyword?: { value: string } | string
 ) => {
   try {
-    const response = await axios.post(
+    console.log('🛫 Sending hospitals to backend:', hospitalList.length)
+
+    const keyword =
+      typeof searchKeyword === 'string' ? searchKeyword : searchKeyword?.value || 'all'
+
+    const response = await fetch(
       'https://us-central1-carefinder-70ff2.cloudfunctions.net/exportHospitalsToCSV',
-      { hospitals: hospitalList }, // Send the filtered hospitals to the backend
       {
-        headers: {
-          'Content-Type': 'application/json'
-        }
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          hospitals: hospitalList,
+          keyword: keyword.trim().toLowerCase().replace(/\s+/g, '_') || 'all'
+        })
       }
     )
 
-    if (response.data.url) {
-      window.open(response.data.url, '_blank')
+    const result = await response.json()
+
+    if (result.url) {
+      console.log('✅ CSV generated at:', result.url)
+      window.open(result.url, '_blank')
     } else {
-      console.error('Error: No URL returned from the server.')
+      console.error('❌ No URL returned')
     }
   } catch (error) {
-    console.error('Error exporting hospitals:', error)
-    throw error
+    console.error('🔥 EXPORT FAILED:', error)
+    alert('Export failed. Check console.')
   }
 }
+
