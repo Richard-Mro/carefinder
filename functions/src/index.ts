@@ -2,13 +2,14 @@ import * as functions from 'firebase-functions'
 import * as admin from 'firebase-admin'
 import * as cors from 'cors'
 import * as nodemailer from 'nodemailer'
-import * as csv from 'csv-writer'
 import { v4 as uuidv4 } from 'uuid'
 import * as fs from 'fs'
 import * as path from 'path'
 import axios from 'axios'
 import { google } from 'googleapis'
 import { Request, Response } from 'express'
+import * as os from 'os'
+import { Parser } from 'json2csv'
 
 admin.initializeApp()
 const bucket = admin.storage().bucket()
@@ -23,28 +24,53 @@ const oAuth2Client = new google.auth.OAuth2(
 oAuth2Client.setCredentials({ refresh_token: functions.config().google.refresh_token })
 
 // Function to get access token for OAuth2
-async function getAccessToken() {
-  const accessTokenResponse = await oAuth2Client.getAccessToken()
-  return accessTokenResponse?.token ?? ''
+async function getAccessToken(): Promise<string> {
+  try {
+    const accessTokenResponse = await oAuth2Client.getAccessToken()
+    return accessTokenResponse?.token ?? ''
+  } catch (error) {
+    console.error('Error getting access token:', error)
+    return ''
+  }
 }
 
 // Create a transporter for sending emails
-async function createTransporter() {
-  const accessToken = await getAccessToken()
+async function createTransporter(): Promise<nodemailer.Transporter> {
+  try {
+    const accessToken = await getAccessToken()
+    console.log(
+      'Access token retrieved (first 10 chars):',
+      accessToken ? accessToken.substring(0, 10) + '...' : 'N/A'
+    ) // Log part of token for debugging
 
-  return nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,
-    auth: {
-      type: 'OAuth2',
-      user: functions.config().email.user,
-      clientId: functions.config().google.client_id,
-      clientSecret: functions.config().google.client_secret,
-      refreshToken: functions.config().google.refresh_token,
-      accessToken: accessToken
+    if (!accessToken) {
+      console.error(
+        'Failed to retrieve access token for Nodemailer. Access token was empty or null.'
+      )
+      throw new Error('Failed to retrieve access token for Nodemailer.')
     }
-  })
+
+    const transporter = nodemailer.createTransport({
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
+      auth: {
+        type: 'OAuth2',
+        user: functions.config().email.user,
+        clientId: functions.config().google.client_id,
+        clientSecret: functions.config().google.client_secret,
+        refreshToken: functions.config().google.refresh_token,
+        accessToken: accessToken
+      }
+    })
+    console.log('Nodemailer transporter created successfully.')
+    return transporter
+  } catch (error) {
+    console.error('Detailed error creating email transporter:', error) // Log the full error object
+    throw new Error(
+      `Failed to create email transporter: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
 }
 
 // Get Firebase Config
@@ -64,7 +90,6 @@ export const getFirebaseConfig = functions.https.onRequest((req: Request, res: R
   })
 })
 
-
 // Export Hospitals to CSV with filtered data
 export const exportHospitalsToCSV = functions.https.onRequest(
   async (req: Request, res: Response) => {
@@ -77,7 +102,6 @@ export const exportHospitalsToCSV = functions.https.onRequest(
 
         const hospitals = req.body.hospitals
         const keyword = (req.body.keyword || 'all').replace(/\s+/g, '_').toLowerCase()
-
 
         // Validate hospitals payload
         if (!Array.isArray(hospitals) || hospitals.length === 0) {
@@ -101,7 +125,7 @@ export const exportHospitalsToCSV = functions.https.onRequest(
         })
 
         const csvContent = csvData
-          .map((row) => row.map((field) => `"${field}"`).join(','))
+          .map((row) => row.map((field) => `\"${field}\"`).join(','))
           .join('\n')
 
         console.log('CSV content ready for writing:', csvContent)
@@ -139,79 +163,60 @@ export const exportHospitalsToCSV = functions.https.onRequest(
   }
 )
 
-
 // Share Hospitals via Email with filtered data
-export const shareHospitalsViaEmail = functions.region('us-central1').https.onRequest(async (req: Request, res: Response) => {
+export const shareHospitalsViaEmail = functions.https.onRequest((req, res) => {
   corsHandler(req, res, async () => {
-    if (req.method !== 'POST') {
-      res.set('Allow', 'POST');
-      res.status(405).send('Method Not Allowed');
-      return;
-    }
-
+    const csvFilePath = path.join(os.tmpdir(), 'hospitals.csv')
     try {
-      const { email, hospitals } = req.body; // Use the hospitals sent from the frontend
-
-      console.log('Received hospitals data for email:', hospitals); // Debug log
-
-      if (!email || !email.includes('@')) {
-        res.status(400).json({ success: false, message: 'Valid email is required.' });
-        return;
+      if (req.method !== 'POST') {
+        return res.status(405).send({ success: false, message: 'Use POST' })
       }
 
-      if (!hospitals || hospitals.length === 0) {
-        res.status(400).json({ success: false, message: 'No hospitals data provided.' });
-        return;
+      const { recipientEmail, hospitals } = req.body
+
+      if (!recipientEmail || !hospitals || !Array.isArray(hospitals)) {
+        return res.status(400).send({
+          success: false,
+          message: 'Invalid input. Expected recipientEmail and hospitals array.'
+        })
       }
 
-      const csvFileName = `hospitals_${uuidv4()}.csv`;
-      const csvFilePath = path.join('/tmp', csvFileName);
-      const csvWriter = csv.createObjectCsvWriter({
-        path: csvFilePath,
-        header: [
-          { id: 'name', title: 'Name' },
-          { id: 'address', title: 'Address' },
-          { id: 'phone', title: 'Phone' },
-          { id: 'website', title: 'Website' }
-        ]
-      });
-      await csvWriter.writeRecords(hospitals); // Use the provided hospitals data
+      const fields = ['name', 'address', 'phone', 'website'] // corrected lowercase keys
+      const parser = new Parser({ fields })
+      const csvData = parser.parse(hospitals)
 
-      console.log('CSV file path:', csvFilePath); // Log the CSV file path
+      fs.writeFileSync(csvFilePath, csvData)
 
-      const transporter = await createTransporter();
+      const transporter = await createTransporter() // Uses OAuth2 properly
+
       const mailOptions = {
         from: functions.config().email.user,
-        to: email,
-        subject: 'List of Hospitals',
-        text: 'Please find the list of hospitals attached.',
+        to: recipientEmail,
+        subject: 'Hospital List from Carefinder',
+        text: 'Please find attached the hospital list in CSV format.',
         attachments: [
           {
-            filename: csvFileName,
+            filename: 'hospitals.csv',
             path: csvFilePath
           }
         ]
-      };
+      }
 
-      await transporter.sendMail(mailOptions);
-
-      fs.unlinkSync(csvFilePath);
-
-      res.json({ success: true, message: 'Email sent successfully.' });
+      await transporter.sendMail(mailOptions)
+      res.status(200).send({ success: true, message: 'Email sent successfully' })
     } catch (error) {
-      console.error('Error sharing hospitals via email:', error);
-      res.status(500).json({ success: false, message: 'Failed to share hospitals.' });
+      console.error('Error sending email:', error)
+      res.status(500).send({ success: false, message: 'Failed to send email.' })
+    } finally {
+      if (fs.existsSync(csvFilePath)) fs.unlinkSync(csvFilePath)
     }
-  });
-});
-
-
-
+  })
+})
 
 // Generate Shareable Link for Filtered Hospitals
 export const generateShareableLinkForFilteredHospitals = functions.https.onRequest(
   async (req: Request, res: Response) => {
-    corsHandler(req, res, async () => {
+  corsHandler(req, res, async () => {
       try {
         // Receive filtered hospitals list from the request body
         const filteredHospitalsList = req.body.hospitals

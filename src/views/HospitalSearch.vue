@@ -27,11 +27,7 @@
       >
         Export to CSV
       </button>
-      <button
-        @click="generateShareableLinkForFilteredHospitalsHandler"
-        class="action-button"
-        :disabled="!isActionable"
-      >
+      <button @click="shareViaEmailHandler" class="action-button" :disabled="!isActionable">
         Share via Email
       </button>
       <button
@@ -54,14 +50,23 @@
         <h3>{{ hospital.name }}</h3>
         <p>ADDRESS: {{ hospital.address }}</p>
         <p>PHONE-NO: {{ hospital.phone }}</p>
-        <p>WEBSITE: <a :href="hospital.website" target="_blank" class="website-link">{{ hospital.website }}</a></p>
+        <p>
+          WEBSITE:
+          <a :href="hospital.website" target="_blank" class="website-link">{{
+            hospital.website
+          }}</a>
+        </p>
       </li>
     </ul>
 
     <div v-if="!loading" class="pagination">
-      <button @click="prevPage" :disabled="currentPage === 1" class="pagination-button">Previous</button>
+      <button @click="prevPage" :disabled="currentPage === 1" class="pagination-button">
+        Previous
+      </button>
       <span class="page-info">{{ currentPage }} / {{ totalPages }}</span>
-      <button @click="nextPage" :disabled="currentPage === totalPages" class="pagination-button">Next</button>
+      <button @click="nextPage" :disabled="currentPage === totalPages" class="pagination-button">
+        Next
+      </button>
     </div>
 
     <div id="map" class="map"></div>
@@ -69,153 +74,181 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, onMounted } from 'vue';
-import { searchHospitals, searchHospitalsNearby } from '@/services/hospitalService';
-import { getCurrentLocation } from '@/services/geolocationHelper';
-import { Hospital } from '@/api/types';
-import { exportHospitals } from '@/services/exportHospitals';
-import { shareViaEmail } from '@/services/shareViaEmail';
-import { saveHospitals, getCachedHospitals } from '@/utils/indexedDB'; // Import IndexedDB functions
-import axios from 'axios';
+import { defineComponent, ref, computed, onMounted } from 'vue'
+import { searchHospitals, searchHospitalsNearby } from '@/services/hospitalService'
+import { getCurrentLocation } from '@/services/geolocationHelper'
+import { Hospital } from '@/api/types'
+import { exportHospitals } from '@/services/exportHospitals'
+import { shareViaEmail } from '@/services/shareViaEmail'
+import { saveHospitals, getCachedHospitals } from '@/utils/indexedDB' // Import IndexedDB functions
+import axios from 'axios'
 
 export default defineComponent({
   name: 'HospitalSearch',
   setup() {
-    const searchKeyword = ref('');
-    const hospitals = ref<Hospital[]>([]);
-    const selectedHospital = ref<Hospital | null>(null);
-    const currentPage = ref(1);
-    const hospitalsPerPage = 2; // Adjust pagination for better UI
-    const loading = ref(false);
-    const map = ref<google.maps.Map | null>(null);
-    const markers: google.maps.Marker[] = [];
-    const location = ref<{ latitude: number; longitude: number } | null>(null);
-    const nearbySearchPerformed = ref(false);
-    const isOffline = ref(!navigator.onLine);
+    const searchKeyword = ref('')
+    const hospitals = ref<Hospital[]>([])
+    const selectedHospital = ref<Hospital | null>(null)
+    const currentPage = ref(1)
+    const hospitalsPerPage = 2 // Adjust pagination for better UI
+    const loading = ref(false)
+    const map = ref<google.maps.Map | null>(null)
+    const markers: google.maps.Marker[] = []
+    const location = ref<{ latitude: number; longitude: number } | null>(null)
+    const nearbySearchPerformed = ref(false)
+    const isOffline = ref(!navigator.onLine)
 
     // Computed: Checks if there is a keyword or nearby search performed
-    const isActionable = computed(() => searchKeyword.value.trim().length > 0 || nearbySearchPerformed.value);
+    const isActionable = computed(
+      () => searchKeyword.value.trim().length > 0 || nearbySearchPerformed.value
+    )
 
     // Computed: Filters hospitals based on the search keyword
     const filteredHospitals = computed(() => {
-      const keyword = searchKeyword.value.toLowerCase();
-      return hospitals.value.filter(hospital =>
-        hospital.name.toLowerCase().includes(keyword) ||
-        hospital.address.toLowerCase().includes(keyword)
-      );
-    });
+      const keyword = searchKeyword.value.toLowerCase()
+      return hospitals.value.filter(
+        (hospital) =>
+          hospital.name.toLowerCase().includes(keyword) ||
+          hospital.address.toLowerCase().includes(keyword)
+      )
+    })
 
     // Computed: Paginates the hospitals
     const paginatedHospitals = computed(() => {
-      const start = (currentPage.value - 1) * hospitalsPerPage;
-      return filteredHospitals.value.slice(start, start + hospitalsPerPage);
-    });
+      const start = (currentPage.value - 1) * hospitalsPerPage
+      return filteredHospitals.value.slice(start, start + hospitalsPerPage)
+    })
 
     // Computed: Calculates total pages for pagination
-    const totalPages = computed(() => Math.ceil(filteredHospitals.value.length / hospitalsPerPage));
+    const totalPages = computed(() => Math.ceil(filteredHospitals.value.length / hospitalsPerPage))
 
     // Select a hospital
     const selectHospital = (hospital: Hospital) => {
-      selectedHospital.value = hospital;
-    };
+      selectedHospital.value = hospital
+    }
 
     // Fetch hospitals from API or IndexedDB
     const performSearch = async () => {
-      loading.value = true;
+      loading.value = true
       try {
         if (navigator.onLine) {
-          const results = await searchHospitals(searchKeyword.value.toLowerCase());
-          hospitals.value = results as Hospital[];
-          await saveHospitals(hospitals.value); // Cache data
+          const results = await searchHospitals(searchKeyword.value.toLowerCase())
+          hospitals.value = results as Hospital[]
+          await saveHospitals(hospitals.value) // Cache data
         } else {
-          hospitals.value = await getCachedHospitals();
-          alert('You are offline. Showing cached hospitals.');
+          hospitals.value = await getCachedHospitals()
+          alert('You are offline. Showing cached hospitals.')
         }
-        currentPage.value = 1;
-        updateMapMarkers();
+        currentPage.value = 1
+        updateMapMarkers()
       } catch (error) {
-        console.error('Error searching hospitals:', error);
+        console.error('Error searching hospitals:', error)
       } finally {
-        loading.value = false;
-      }
-    };
-
-    // Fetch nearby hospitals
-    const searchNearbyHospitals = async () => {
-      loading.value = true;
-      try {
-        const loc = await getCurrentLocation();
-        if (loc) {
-          location.value = { latitude: loc.lat(), longitude: loc.lng() };
-          const results = await searchHospitalsNearby(location.value.latitude, location.value.longitude);
-          hospitals.value = results as Hospital[];
-          await saveHospitals(hospitals.value); // Cache data
-          nearbySearchPerformed.value = true;
-          updateMapMarkers();
-        } else {
-          throw new Error('Could not get current location.');
-        }
-      } catch (error) { 
-  if (error instanceof Error) {
-    console.error('Error searching nearby hospitals:', error.message);
-    alert(error.message);
-  } else {
-    console.error('An unknown error occurred:', error);
-    alert('An unknown error occurred while searching for nearby hospitals.');
-  }
-} finally {
-  loading.value = false;
-}
-
-    };
-
-    // Export hospitals
-    const exportFilteredHospitalsHandler = async () => {
-  loading.value = true;
-
-  const keyword = searchKeyword.value.trim();
-  const exportCount = filteredHospitals.value.length;
-
-  try {
-    if (!keyword) {
-      const confirmAll = confirm(`No search keyword entered.\nExport all ${exportCount} hospitals?`);
-      if (!confirmAll) {
-        loading.value = false;
-        return;
-      }
-    } else {
-      const confirmFiltered = confirm(`Export ${exportCount} hospitals matching "${keyword}"?`);
-      if (!confirmFiltered) {
-        loading.value = false;
-        return;
+        loading.value = false
       }
     }
 
-    await exportHospitals(filteredHospitals.value, searchKeyword);
-  } catch (error) {
-    console.error('Error exporting hospitals:', error);
-    alert('Failed to export hospitals.');
-  } finally {
-    loading.value = false;
-  }
-};
+    // Fetch nearby hospitals
+    const searchNearbyHospitals = async () => {
+      loading.value = true
+      try {
+        const loc = await getCurrentLocation()
+        if (loc) {
+          location.value = { latitude: loc.lat(), longitude: loc.lng() }
+          const results = await searchHospitalsNearby(
+            location.value.latitude,
+            location.value.longitude
+          )
+          hospitals.value = results as Hospital[]
+          await saveHospitals(hospitals.value) // Cache data
+          nearbySearchPerformed.value = true
+          updateMapMarkers()
+        } else {
+          throw new Error('Could not get current location.')
+        }
+      } catch (error) {
+        if (error instanceof Error) {
+          console.error('Error searching nearby hospitals:', error.message)
+          alert(error.message)
+        } else {
+          console.error('An unknown error occurred:', error)
+          alert('An unknown error occurred while searching for nearby hospitals.')
+        }
+      } finally {
+        loading.value = false
+      }
+    }
 
+    // Export hospitals
+    const exportFilteredHospitalsHandler = async () => {
+      loading.value = true
 
+      const keyword = searchKeyword.value.trim()
+      const exportCount = filteredHospitals.value.length
+
+      try {
+        if (!keyword) {
+          const confirmAll = confirm(
+            `Observed that the input location filter was not used.\nExport all ${exportCount} hospitals in your location?`
+          )
+          if (!confirmAll) {
+            loading.value = false
+            return
+          }
+        } else {
+          const confirmFiltered = confirm(`Export ${exportCount} hospitals matching "${keyword}"?`)
+          if (!confirmFiltered) {
+            loading.value = false
+            return
+          }
+        }
+
+        await exportHospitals(filteredHospitals.value, searchKeyword)
+      } catch (error) {
+        console.error('Error exporting hospitals:', error)
+        alert('Failed to export hospitals.')
+      } finally {
+        loading.value = false
+      }
+    }
 
     // Generate shareable link
     const generateShareableLinkForFilteredHospitalsHandler = async () => {
+      loading.value = true
+      try {
+        const response = await axios.post(
+          'https://us-central1-carefinder-70ff2.cloudfunctions.net/generateShareableLinkForFilteredHospitals',
+          {
+            hospitals: filteredHospitals.value
+          }
+        )
+
+        const shareableLink = response.data.shortUrl
+        await copyToClipboard(shareableLink)
+        alert('Shareable link copied to clipboard!')
+      } catch (error) {
+        console.error('Error generating shareable link:', error)
+        alert('Failed to generate shareable link.')
+      } finally {
+        loading.value = false
+      }
+    }
+
+    // Share via Email
+    const shareViaEmailHandler = async () => {
+      const email = prompt('Please enter the email address to share with:');
+      if (!email) {
+        alert('Email sharing cancelled.');
+        return;
+      }
+
       loading.value = true;
       try {
-        const response = await axios.post('https://us-central1-carefinder-70ff2.cloudfunctions.net/generateShareableLinkForFilteredHospitals', {
-          hospitals: filteredHospitals.value,
-        });
-
-        const shareableLink = response.data.shortUrl;
-        await copyToClipboard(shareableLink);
-        alert('Shareable link copied to clipboard!');
+        await shareViaEmail(email, filteredHospitals.value);
+        alert('Hospitals shared via email successfully!');
       } catch (error) {
-        console.error('Error generating shareable link:', error);
-        alert('Failed to generate shareable link.');
+        console.error('Error sharing hospitals via email:', error);
+        alert('Failed to share hospitals via email.');
       } finally {
         loading.value = false;
       }
@@ -224,76 +257,76 @@ export default defineComponent({
     // Copy text to clipboard
     const copyToClipboard = async (text: string) => {
       try {
-        await navigator.clipboard.writeText(text);
+        await navigator.clipboard.writeText(text)
       } catch (error) {
-        console.error('Clipboard API not supported:', error);
+        console.error('Clipboard API not supported:', error)
       }
-    };
+    }
 
     // Update map markers
     const updateMapMarkers = () => {
-      if (!map.value) return;
-      markers.forEach(marker => marker.setMap(null));
-      markers.length = 0;
+      if (!map.value) return
+      markers.forEach((marker) => marker.setMap(null))
+      markers.length = 0
 
-      paginatedHospitals.value.forEach(hospital => {
+      paginatedHospitals.value.forEach((hospital) => {
         const marker = new google.maps.Marker({
           position: { lat: hospital.location.latitude, lng: hospital.location.longitude },
           map: map.value,
-          title: hospital.name,
-        });
-        markers.push(marker);
-      });
-    };
+          title: hospital.name
+        })
+        markers.push(marker)
+      })
+    }
 
     // Pagination functions
     const prevPage = () => {
-      if (currentPage.value > 1) currentPage.value--;
-    };
+      if (currentPage.value > 1) currentPage.value--
+    }
 
     const nextPage = () => {
-      if (currentPage.value < totalPages.value) currentPage.value++;
-    };
+      if (currentPage.value < totalPages.value) currentPage.value++
+    }
 
     // On component mount, fetch hospitals (online or offline)
     onMounted(async () => {
       try {
         if (navigator.onLine) {
-          const results = await searchHospitals('');
-          hospitals.value = results as Hospital[];
-          await saveHospitals(hospitals.value);
+          const results = await searchHospitals('')
+          hospitals.value = results as Hospital[]
+          await saveHospitals(hospitals.value)
         } else {
-          hospitals.value = await getCachedHospitals();
-          alert('You are offline. Showing cached hospitals.');
+          hospitals.value = await getCachedHospitals()
+          alert('You are offline. Showing cached hospitals.')
         }
-        updateMapMarkers();
+        updateMapMarkers()
       } catch (error) {
-        console.error('Error fetching hospitals:', error);
+        console.error('Error fetching hospitals:', error)
       }
 
       // Google Maps Initialization
       window.initMap = () => {
         map.value = new google.maps.Map(document.getElementById('map') as HTMLElement, {
           center: { lat: 9.082, lng: 8.6753 },
-          zoom: 5.5,
-        });
-        updateMapMarkers();
-      };
+          zoom: 5.5
+        })
+        updateMapMarkers()
+      }
 
       if (!document.querySelector('script[src*="https://maps.googleapis.com/maps/api/js"]')) {
-        const script = document.createElement('script');
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_APP_GOOGLE_MAPS_API_KEY}&callback=initMap`;
-        script.async = true;
-        script.defer = true;
-        document.head.appendChild(script);
+        const script = document.createElement('script')
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_APP_GOOGLE_MAPS_API_KEY}&callback=initMap`
+        script.async = true
+        script.defer = true
+        document.head.appendChild(script)
       } else {
-        window.initMap();
+        window.initMap()
       }
 
       // Detect offline/online changes
-      window.addEventListener('online', () => isOffline.value = false);
-      window.addEventListener('offline', () => isOffline.value = true);
-    });
+      window.addEventListener('online', () => (isOffline.value = false))
+      window.addEventListener('offline', () => (isOffline.value = true))
+    })
 
     return {
       searchKeyword,
@@ -311,13 +344,11 @@ export default defineComponent({
       isActionable,
       selectedHospital,
       isOffline,
-    };
+      shareViaEmailHandler, // Make sure to return the new handler
+    }
   }
-});
+})
 </script>
-
-
-
 
 <style scoped>
 :root {
@@ -325,7 +356,7 @@ export default defineComponent({
   --color-primary: #3498db;
   --color-secondary: #2c3e50;
   --color-accent: #15ce0b;
-  --color:white;
+  --color: white;
   --color-background-light: #f5f5f5;
   --color-background-card-light: #ffffff;
   --color-text-light: #333;
@@ -345,7 +376,7 @@ export default defineComponent({
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color:var(--color);
+    --color: var(--color);
     --color-background-light: var(--color-background-dark);
     --color-background-card-light: var(--color-background-card-dark);
     --color-text-light: var(--color-text-dark);
@@ -385,8 +416,12 @@ export default defineComponent({
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* Button styling */
@@ -417,7 +452,10 @@ export default defineComponent({
   border: 1px solid var(--color-border-light);
   background-color: var(--color-background-card-light);
   color: var(--color-text-light);
-  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease,
+    border-color 0.3s ease;
 }
 
 .action-buttons {
@@ -460,7 +498,10 @@ export default defineComponent({
   background-color: var(--color-background-card-light);
   color: var(--color-text-light);
   box-shadow: 0 2px 8px var(--color-shadow-light);
-  transition: background-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
+  transition:
+    background-color 0.3s ease,
+    box-shadow 0.3s ease,
+    transform 0.3s ease;
   overflow: hidden;
   word-wrap: break-word;
 }
