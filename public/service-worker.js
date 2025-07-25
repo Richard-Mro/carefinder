@@ -1,5 +1,8 @@
 // service-worker.js
 
+importScripts('https://cdn.jsdelivr.net/npm/idb@7/build/umd.js')
+const { openDB } = idb
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
@@ -28,14 +31,27 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = event.request.url
 
+  if (
+    url.includes('/api/') ||
+    url.includes('cloudfunctions.net') ||
+    url.includes('googleapis.com')
+  ) {
+    event.respondWith(fetch(event.request))
+    return
+  }
+
   if (url.includes('/hospitals')) {
     event.respondWith(
       (async () => {
         try {
+          if (typeof openDB !== 'function') {
+            throw new Error('openDB is not available')
+          }
+
           const db = await openDB(DB_NAME, 1, {
             upgrade(db) {
               if (!db.objectStoreNames.contains(STORE_NAME)) {
-                db.createObjectStore(STORE_NAME, { keyPath: 'id' }) // adjust keyPath if needed
+                db.createObjectStore(STORE_NAME, { keyPath: 'id' })
               }
             }
           })
@@ -51,11 +67,9 @@ self.addEventListener('fetch', (event) => {
             })
           }
 
-          // Fetch from network if no cached data
           const response = await fetch(event.request)
           const hospitals = await response.clone().json()
 
-          // Save to IndexedDB
           const writeTx = db.transaction(STORE_NAME, 'readwrite')
           const writeStore = writeTx.objectStore(STORE_NAME)
           hospitals.forEach((hospital) => writeStore.put(hospital))
@@ -64,7 +78,7 @@ self.addEventListener('fetch', (event) => {
           return response
         } catch (error) {
           console.error('Error handling hospitals fetch:', error)
-          return caches.match('/offline.html')
+          return fetch(event.request)
         }
       })()
     )

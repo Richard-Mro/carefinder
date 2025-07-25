@@ -6,7 +6,7 @@
 
     <!-- Reposition the Search Nearby Hospitals button above the search input -->
     <button @click="searchNearbyHospitals" class="search-nearby-button">
-      Click to Search Hospitals Near You
+      Click To Show Hospitals Around Your Present Location
     </button>
 
     <div class="search-bar">
@@ -14,7 +14,7 @@
         type="text"
         v-model="searchKeyword"
         @input="performSearch"
-        placeholder="Input your preferred Location or State..."
+        placeholder="Input Your Desired Location Or State In Nigeria here..., to use the buttons below or you click the button above to show hospitals around you"
         class="search-input"
       />
     </div>
@@ -38,6 +38,8 @@
         Generate Shareable Link for Filtered Hospitals
       </button>
     </div>
+
+    <marquee behavior="scroll" direction="left"><p style="color: grey;">Below are list of Hospitals:</p></marquee>
 
     <ul v-if="!loading" class="hospital-list">
       <li
@@ -189,7 +191,7 @@ export default defineComponent({
       try {
         if (!keyword) {
           const confirmAll = confirm(
-            `Observed that the input location filter was not used.\nExport all ${exportCount} hospitals in your location?`
+            `Input location filter not used.\nExport all ${exportCount} hospitals in your current location?`
           )
           if (!confirmAll) {
             loading.value = false
@@ -216,19 +218,41 @@ export default defineComponent({
     const generateShareableLinkForFilteredHospitalsHandler = async () => {
       loading.value = true
       try {
+        const hospitals = filteredHospitals.value
+
+        if (!hospitals || !Array.isArray(hospitals) || hospitals.length === 0) {
+          alert('No hospitals found to generate a shareable link.')
+          return
+        }
+
+        const hospitalIds = hospitals.map((h) => h.id).filter(Boolean) // ensures no undefined/null IDs
+
+        if (hospitalIds.length === 0) {
+          alert('No valid hospital IDs found.')
+          return
+        }
+
         const response = await axios.post(
-          'https://us-central1-carefinder-70ff2.cloudfunctions.net/generateShareableLinkForFilteredHospitals',
-          {
-            hospitals: filteredHospitals.value
-          }
+          'https://us-central1-carefinder-70ff2.cloudfunctions.net/api/generateShareableLinkForFilteredHospitals',
+          { hospitalIds },
+          { headers: { 'Content-Type': 'application/json' } }
         )
 
-        const shareableLink = response.data.shortUrl
-        await copyToClipboard(shareableLink)
-        alert('Shareable link copied to clipboard!')
-      } catch (error) {
-        console.error('Error generating shareable link:', error)
-        alert('Failed to generate shareable link.')
+        const shareableLink = response.data?.shareableUrl || response.data?.url
+
+        if (shareableLink) {
+          await copyToClipboard(shareableLink)
+          alert('Shareable link copied to clipboard!')
+        } else {
+          console.error('No link received from server:', response.data)
+          alert('No shareable link returned from server.')
+        }
+      } catch (error: any) {
+        console.error('Error generating shareable link:', error?.response?.data || error)
+        alert(
+          'Failed to generate shareable link. Server responded with: ' +
+            (error?.response?.data?.message || 'Unknown Error')
+        )
       } finally {
         loading.value = false
       }
@@ -236,23 +260,23 @@ export default defineComponent({
 
     // Share via Email
     const shareViaEmailHandler = async () => {
-      const email = prompt('Please enter the email address to share with:');
+      const email = prompt('Please enter the email address to share with:')
       if (!email) {
-        alert('Email sharing cancelled.');
-        return;
+        alert('Email sharing cancelled.')
+        return
       }
 
-      loading.value = true;
+      loading.value = true
       try {
-        await shareViaEmail(email, filteredHospitals.value);
-        alert('Hospitals shared via email successfully!');
+        await shareViaEmail(email, filteredHospitals.value)
+        alert('Hospitals shared via email successfully!')
       } catch (error) {
-        console.error('Error sharing hospitals via email:', error);
-        alert('Failed to share hospitals via email.');
+        console.error('Error sharing hospitals via email:', error)
+        alert('Failed to share hospitals via email.')
       } finally {
-        loading.value = false;
+        loading.value = false
       }
-    };
+    }
 
     // Copy text to clipboard
     const copyToClipboard = async (text: string) => {
@@ -344,7 +368,7 @@ export default defineComponent({
       isActionable,
       selectedHospital,
       isOffline,
-      shareViaEmailHandler, // Make sure to return the new handler
+      shareViaEmailHandler // Make sure to return the new handler
     }
   }
 })
@@ -355,7 +379,6 @@ export default defineComponent({
   /* Light mode colors */
   --color-primary: #3498db;
   --color-secondary: #2c3e50;
-  --color-accent: #15ce0b;
   --color: white;
   --color-background-light: #f5f5f5;
   --color-background-card-light: #ffffff;
@@ -427,19 +450,23 @@ export default defineComponent({
 /* Button styling */
 .search-nearby-button {
   padding: 10px;
-  background-color: var(--color-accent);
-  color: var(--color);
+  background-color: var(--color-primary);
+  color: white;
+  border: none;
   border-radius: 5px;
   cursor: pointer;
   font-weight: bold;
-  margin-bottom: 15px;
+  margin-bottom: 5pxx;
   transition: background-color 0.3s ease;
 }
 
 .search-nearby-button:hover {
-  background-color: darken(var(--color-accent), 10%);
+  background-color: #0e6f30;
 }
 
+.search-nearby-button:active {
+  background-color: #0f9907; /* further dark */
+}
 .search-bar {
   display: flex;
   gap: 10px;
@@ -449,7 +476,7 @@ export default defineComponent({
   flex: 1;
   padding: 10px;
   border-radius: 5px;
-  border: 1px solid var(--color-border-light);
+  border: 3px solid var(--color-border-light);
   background-color: var(--color-background-card-light);
   color: var(--color-text-light);
   transition:
@@ -467,10 +494,15 @@ export default defineComponent({
   padding: 10px;
   background-color: var(--color-primary);
   color: white;
+  width: 340px;
   border: none;
   border-radius: 5px;
   cursor: pointer;
   transition: background-color 0.3s ease;
+}
+
+.action-button:hover {
+  background-color: #0e6f30; /* darker #3498db */
 }
 
 .action-button:disabled {
@@ -480,7 +512,7 @@ export default defineComponent({
 }
 
 .action-button:hover:not(:disabled) {
-  background-color: darken(var(--color-primary), 10%);
+  background-color: #0e6f30; /* darker #3498db */
 }
 
 /* Hospital list and cards */
@@ -531,18 +563,6 @@ export default defineComponent({
   color: var(--color-primary);
 }
 
-.hospital-card p.address {
-  color: var(--color-secondary);
-}
-
-.hospital-card p.phone {
-  color: var(--color-accent);
-}
-
-.hospital-card p.website {
-  color: var(--color-primary);
-}
-
 .website-link {
   color: inherit;
   text-decoration: underline;
@@ -577,7 +597,7 @@ export default defineComponent({
 }
 
 .pagination-button:hover:not(:disabled) {
-  background-color: darken(var(--color-primary), 10%);
+  background-color: #0e6f30;
 }
 
 .map {

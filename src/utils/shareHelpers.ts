@@ -14,8 +14,3 @@ export const composeEmailBody = (hospitals: Hospital[]): string => {
   return emailBody
 }
 
-export const generateShareableLink = (hospitals: Hospital[]): string => {
-  const baseUrl = window.location.origin
-  const hospitalsData = encodeURIComponent(JSON.stringify(hospitals))
-  return `${baseUrl}/share?hospitals=${hospitalsData}`
-}

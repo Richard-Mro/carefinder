@@ -2,7 +2,6 @@ import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router'
 import Signup from '../views/signUp.vue'
 import Login from '../views/Login.vue'
 import HospitalSearch from '../views/HospitalSearch.vue'
-import FilteredHospitals from '../views/FilteredHospitals.vue'
 import HospitalDetail from '../views/HospitalDetail.vue'
 import CreateHospitalEntry from '../views/CreateHospitalEntry.vue'
 import NotAuthorized from '../views/NotAuthorized.vue'
@@ -24,12 +23,9 @@ const routes: Array<RouteRecordRaw> = [
     component: HospitalSearch
   },
   {
-    path: '/filtered-hospitals',
-    name: 'FilteredHospitals',
-    component: FilteredHospitals,
-    props: (route) => ({
-      data: route.query.data ? JSON.parse(decodeURIComponent(route.query.data as string)) : []
-    })
+    path: '/shared-results/:id',
+    name: 'SharedResults',
+    component: () => import('../views/SharedResults.vue')
   },
   {
     path: '/create-hospital',
