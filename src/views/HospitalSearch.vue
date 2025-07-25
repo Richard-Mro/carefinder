@@ -39,7 +39,7 @@
       </button>
     </div>
 
-    <marquee behavior="scroll" direction="left"><p style="color: grey;">Below are list of Hospitals:</p></marquee>
+    <marquee behavior="scroll" direction="right" ><p style="color: grey; margin: 0 5px;" >Below are list of Hospitals:</p></marquee>
 
     <ul v-if="!loading" class="hospital-list">
       <li
@@ -415,7 +415,11 @@ export default defineComponent({
   flex-direction: column;
   gap: 20px;
 }
-
+@media (min-width:768px) {
+  .container {
+    margin: 0 25px;
+  }
+}
 .loading-overlay {
   position: fixed;
   top: 0;
@@ -479,6 +483,8 @@ export default defineComponent({
   border: 3px solid var(--color-border-light);
   background-color: var(--color-background-card-light);
   color: var(--color-text-light);
+  outline-color: var(--color-background-card-light);
+  outline: none;
   transition:
     background-color 0.3s ease,
     color 0.3s ease,
@@ -513,6 +519,23 @@ export default defineComponent({
 
 .action-button:hover:not(:disabled) {
   background-color: #0e6f30; /* darker #3498db */
+}
+marquee{
+  margin: 5px 0;
+  font-style: italic;
+}
+
+@media (max-width: 768px){
+  .action-buttons{
+    width: 100%;
+    display: block;
+   
+  }
+  .action-button{
+   width: 100%;
+    display: block; 
+     margin-top: 10px;
+  }
 }
 
 /* Hospital list and cards */

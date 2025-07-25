@@ -14,7 +14,7 @@ app.use(router) // Use the router
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker
-      .register('/service-worker.js')
+      .register('/service-worker.mjs')
       .then((registration) => {
         console.log('ServiceWorker registered with scope:', registration.scope)
       })
